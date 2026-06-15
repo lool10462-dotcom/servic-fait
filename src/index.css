@@ -1,0 +1,119 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+
+  /* CNIPLC Official Gold Palette overriding teal */
+  --color-teal-50: #fdfaf2;
+  --color-teal-100: #faf1d8;
+  --color-teal-150: #f5e7c2;
+  --color-teal-200: #f2dfae;
+  --color-teal-500: #c5a043;
+  --color-teal-600: #b08c32;
+  --color-teal-700: #937123;
+  --color-teal-800: #735418;
+  --color-teal-900: #553e11;
+  --color-teal-950: #2c1e05;
+
+  /* CNIPLC Slogan Crimson Red Palette overriding indigo */
+  --color-indigo-50: #fef2f2;
+  --color-indigo-100: #fee2e2;
+  --color-indigo-200: #fecaca;
+  --color-indigo-500: #ef4444;
+  --color-indigo-600: #dc2626;
+  --color-indigo-700: #b91c1c;
+  --color-indigo-800: #991b1b;
+  --color-indigo-900: #7f1d1d;
+  --color-indigo-950: #450a0a;
+
+  --color-emerald-500: #10b981;
+  --color-emerald-600: #059669;
+}
+
+/* Print Overrides to match beautiful paper documents and clear administrative logs */
+@media print {
+  /* Hide non-print structures */
+  .no-print, 
+  header, 
+  nav, 
+  footer, 
+  main,
+  button,
+  form,
+  aside,
+  #root > div > main,
+  #root > div > header,
+  #root > div > nav,
+  #root > div > footer {
+    display: none !important;
+    visibility: hidden !important;
+    height: 0 !important;
+    overflow: hidden !important;
+  }
+
+  /* Make sure our print container displays and occupies full width */
+  #print-area-only,
+  #print-area-only *,
+  [id^="fiche-print-container-"],
+  [id^="fiche-print-container-"] * {
+    display: block !important;
+    visibility: visible !important;
+  }
+
+  #print-area-only {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 210mm !important;
+    min-height: 297mm !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    background: white !important;
+    color: black !important;
+  }
+
+  /* Keep table borders visible during print */
+  table {
+    border: 1px solid #111827 !important;
+    border-collapse: collapse !important;
+    width: 100% !important;
+  }
+  
+  th, td {
+    border: 1px solid #374151 !important;
+    padding: 6px !important;
+    color: black !important;
+  }
+
+  /* Force headers to look bold on grey/white sheets */
+  h1, h2, h3, h4, th, strong {
+    color: #000000 !important;
+    font-weight: bold !important;
+  }
+
+  /* Reset body colors & borders to pure white */
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  /* Remove headers or footers added automatically by browser */
+  @page {
+    size: A4 portrait;
+    margin: 15mm 10mm 15mm 10mm;
+  }
+}
+
+/* Micro animations for layout smooth fading */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.2s ease-out forwards;
+}

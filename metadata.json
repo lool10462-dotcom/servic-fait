@@ -1,0 +1,6 @@
+{
+  "name": "Registre des Interventions IT",
+  "description": "Application professionnelle de registre et de génération d'attestations de service fait pour les interventions informatiques au CNIPLC.",
+  "requestFramePermissions": ["microphone"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
