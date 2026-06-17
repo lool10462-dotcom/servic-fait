@@ -484,8 +484,12 @@ export default function App() {
       <div className={`min-h-screen flex items-center justify-center p-4 ${isDark ? 'bg-slate-950 text-white' : 'bg-slate-50 text-slate-900'}`}>
         <div className={`max-w-md w-full p-8 rounded-2xl shadow-xl border ${isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'}`}>
           <div className="text-center mb-8">
-            <h1 className="text-2xl font-bold text-teal-600 mb-2">CNIPLC IT Manager</h1>
-            <p className={isDark ? 'text-slate-400' : 'text-slate-500'}>
+            <img src="/logo.jpeg" alt="CNIPLC Logo" className="h-20 w-20 object-contain mx-auto mb-4 rounded-2xl shadow-lg" />
+            <h1 className="text-2xl font-bold text-teal-600 mb-2">CNIPLC - Registre IT Pro</h1>
+            <p className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+              Commission Nationale Indépendante pour la Prévention et la Lutte contre la Corruption
+            </p>
+            <p className={`mt-2 text-sm ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
               Connectez-vous à votre espace technique sécurisé
             </p>
           </div>
@@ -570,9 +574,12 @@ export default function App() {
         <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
           {/* Logo and Brand */}
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-teal-500 to-emerald-600 flex items-center justify-center text-white font-bold shadow-md">
-              RI
-            </div>
+            <img 
+              src="/logo.jpeg" 
+              alt="CNIPLC Logo" 
+              className="h-11 w-11 object-contain rounded-xl shadow-md border border-slate-200/50"
+              onError={(e) => { e.currentTarget.style.display = 'none'; }}
+            />
             <div>
               <h1 className="text-lg font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-teal-500 to-emerald-500">
                 Registre IT Pro
@@ -753,7 +760,7 @@ export default function App() {
               transition={{ duration: 0.2 }}
             >
               <NewInterventionForm 
-                onSave={handleCreateIntervention} 
+                onSave={handleSaveIntervention} 
                 techProfile={techProfile}
                 theme={theme}
                 interventions={interventions}
