@@ -62,7 +62,7 @@ export const INITIAL_INTERVENTIONS: Intervention[] = [
     signatureDate: "2026-06-01",
     durationMinutes: 45,
     quickNotes: "Observation : L'utilisateur signale que la batterie chauffe aussi légèrement lors d'une utilisation prolongée.",
-    createdAt: "2026-06-01T09:30:00Z"
+    created_at: "2026-06-01T09:30:00Z"
   },
   {
     id: "INT-2026-0002",
@@ -86,7 +86,7 @@ export const INITIAL_INTERVENTIONS: Intervention[] = [
     signatureDate: "2026-06-02",
     durationMinutes: 60,
     quickNotes: "",
-    createdAt: "2026-06-02T11:15:00Z"
+    created_at: "2026-06-02T11:15:00Z"
   },
   {
     id: "INT-2026-0003",
@@ -110,6 +110,6 @@ export const INITIAL_INTERVENTIONS: Intervention[] = [
     signatureDate: "2026-06-03",
     durationMinutes: 90,
     quickNotes: "Détail : Il s'avère que le disque avait de nombreux fichiers résiduels d'anciennes installations d'OS.",
-    createdAt: "2026-06-03T08:20:00Z"
+    created_at: "2026-06-03T08:20:00Z"
   }
 ];

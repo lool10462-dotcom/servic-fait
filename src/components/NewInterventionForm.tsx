@@ -12,7 +12,7 @@ import PhotoCollage from "./PhotoCollage";
 import { Employee, fetchEmployees } from "../lib/supabase";
 
 interface NewInterventionFormProps {
-  onSave: (intervention: Omit<Intervention, "id" | "refNumber" | "createdAt">) => void;
+  onSave: (intervention: Omit<Intervention, "id" | "refNumber" | "created_at">) => void;
   techProfile: TechProfile | null;
   theme?: "light" | "dark";
   interventions: Intervention[];

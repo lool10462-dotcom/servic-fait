@@ -30,7 +30,7 @@ export interface Intervention {
   durationMinutes: number; // Durée de l'intervention
   quickNotes?: string; // Notes rapides optionnelles (détails contextuels / observations)
   photos?: DevicePhoto[]; // Photos d'intervention avec descriptions
-  createdAt: string;
+  created_at: string;
 }
 
 export interface DevicePhoto {

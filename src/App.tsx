@@ -243,10 +243,10 @@ export default function App() {
   };
 
   // Handlers
-  const handleSaveIntervention = async (newInt: Omit<Intervention, "id" | "refNumber" | "createdAt">) => {
+  const handleSaveIntervention = async (newInt: Omit<Intervention, "id" | "refNumber" | "created_at">) => {
     const id = `int-${Date.now()}`;
     const refNumber = `REF-${Math.floor(Math.random() * 10000).toString().padStart(4, "0")}`;
-    const createdAt = new Date().toISOString();
+    const created_at = new Date().toISOString();
     
     // Default signatureDate only if "termine"
     const signatureDate = newInt.status === "termine" ? newInt.date : undefined;
@@ -255,7 +255,7 @@ export default function App() {
       ...newInt,
       id,
       refNumber,
-      createdAt,
+      created_at,
       signatureDate,
       user_id: session?.user.id
     } as Intervention;
