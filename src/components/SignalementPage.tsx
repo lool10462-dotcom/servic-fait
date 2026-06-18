@@ -58,21 +58,28 @@ export default function SignalementPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-slate-100 font-sans">
       {/* Header */}
-      <header className="pt-12 pb-8 text-center px-4">
+      <header className="pt-12 pb-6 text-center px-4">
         <div className="flex justify-center mb-6">
-          <img src="/logo.jpeg" alt="CNIPLC Logo" className="w-24 h-24 object-contain rounded-2xl shadow-xl border border-white/10 bg-white" />
+          <img src="/logo.jpeg" alt="CNIPLC Logo" className="w-24 h-24 object-contain rounded-2xl shadow-xl border border-white/10 bg-white anim-logo" />
         </div>
-        <h1 className="text-3xl font-extrabold tracking-tight text-white mb-2">CNIPLC</h1>
-        <p className="text-slate-400 text-sm max-w-sm mx-auto leading-relaxed">
+        <h1 className="text-3xl font-extrabold tracking-tight text-white mb-2 anim-title">CNIPLC</h1>
+        <p className="text-slate-400 text-sm max-w-sm mx-auto leading-relaxed anim-subtitle">
           Commission Nationale Indépendante pour la Prévention et la Lutte contre la Corruption
         </p>
       </header>
 
       <main className="max-w-lg mx-auto px-4 pb-16 space-y-8">
+        {/* Intro text */}
+        <div className="text-center anim-hero">
+          <p className="text-slate-300 text-[15px] leading-relaxed border-l-2 border-amber-500 pl-4 text-left italic bg-slate-900/40 p-4 rounded-r-xl shadow-sm">
+            "Bienvenue sur le portail officiel d'assistance informatique. Notre équipe technique est à votre disposition pour assurer la continuité et la sécurité de vos outils de travail. Signalez toute anomalie avec précision pour une intervention rapide."
+          </p>
+        </div>
+
         {/* Carte Signal */}
-        <div className="bg-white/5 backdrop-blur-md rounded-3xl p-8 border border-white/10 shadow-2xl">
+        <div className="bg-white/5 backdrop-blur-md rounded-3xl p-8 border border-white/10 shadow-2xl anim-card">
           <div className="flex items-center gap-4 mb-8">
-            <div className="w-14 h-14 bg-red-500/20 rounded-2xl flex items-center justify-center text-red-400 text-2xl border border-red-500/20 shadow-inner">
+            <div className="w-14 h-14 bg-red-500/20 rounded-2xl flex items-center justify-center text-red-400 text-2xl border border-red-500/20 shadow-inner anim-float">
               📋
             </div>
             <div>
@@ -159,7 +166,7 @@ export default function SignalementPage() {
         </div>
 
         {/* Zone intelligente - Redirection Service Fait */}
-        <div className="bg-gradient-to-br from-emerald-900/40 to-teal-900/30 backdrop-blur-lg rounded-3xl p-8 border border-emerald-500/30 shadow-xl group hover:border-emerald-500/50 transition-all">
+        <div className="bg-gradient-to-br from-emerald-900/40 to-teal-900/30 backdrop-blur-lg rounded-3xl p-8 border border-emerald-500/30 shadow-xl group hover:border-emerald-500/50 transition-all anim-cta">
           <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6 text-center sm:text-left">
             <div className="w-16 h-16 bg-emerald-500/20 rounded-2xl flex items-center justify-center text-3xl flex-shrink-0 shadow-inner border border-emerald-500/30 group-hover:scale-110 transition-transform">
               💡
@@ -185,7 +192,7 @@ export default function SignalementPage() {
         </div>
 
         {/* Footer */}
-        <footer className="text-center text-slate-500 text-xs font-medium opacity-60">
+        <footer className="text-center text-slate-500 text-xs font-medium opacity-60 anim-footer">
           © 2026 CNIPLC — Plateforme de Signalement Sécurisée
         </footer>
       </main>
