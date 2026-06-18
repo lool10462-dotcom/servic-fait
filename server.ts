@@ -178,6 +178,73 @@ app.post("/api/refine-tasks", async (req: Request, res: Response): Promise<void>
   });
 });
 
+// Endpoint to notify Telegram
+app.post("/api/notify-telegram", async (req: Request, res: Response) => {
+  const body = req.body;
+  const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
+  const CHAT_ID = process.env.TELEGRAM_CHAT_ID;
+
+  if (!BOT_TOKEN || !CHAT_ID) {
+    console.error("Local Environment Variables TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID are missing.");
+    res.status(500).json({ error: 'Server misconfiguration' });
+    return;
+  }
+
+  const emojiType: Record<string, string> = {
+    bug: "🐛",
+    acces: "🔐",
+    fonctionnalite: "✨",
+    incident: "⚠️",
+    autre: "📌"
+  };
+
+  const emojiPriority: Record<string, string> = {
+    basse: "🟢",
+    moyenne: "🟡",
+    haute: "🟠",
+    urgente: "🔴"
+  };
+
+  const message = `
+🚨 *NOUVEAU SIGNALEMENT — CNIPLC*
+
+*Agent:* ${body.agentName}
+*Contact:* ${body.contact}
+*Type:* ${emojiType[body.type] || "📋"} ${body.type}
+*Priorité:* ${emojiPriority[body.priority] || "⚪"} ${body.priority}
+
+*Description:*
+\`\`\`
+${body.description}
+\`\`\`
+
+⏰ *Reçu le:* ${body.timestamp}
+  `.trim();
+
+  try {
+    const response = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        chat_id: CHAT_ID,
+        text: message,
+        parse_mode: "Markdown"
+      })
+    });
+
+    if (!response.ok) {
+      const tgError = await response.text();
+      console.error("Telegram API error:", tgError);
+      throw new Error("Telegram API error");
+    }
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error("Error sending to telegram:", error);
+    res.status(500).json({ success: false, error: "Failed to send to Telegram" });
+  }
+});
+
 // Endpoint to parse voice transcripts into structured intervention fields
 app.post("/api/parse-voice", async (req: Request, res: Response): Promise<void> => {
   const { transcript } = req.body;
