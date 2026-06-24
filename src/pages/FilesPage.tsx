@@ -8,17 +8,17 @@ import {
 
 export default function FilesPage() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const [selectedPeerId, setSelectedPeerId] = useState<string>(searchParams.get('peerId') || '');
+  const [selectedPeerIds, setSelectedPeerIds] = useState<string[]>(searchParams.get('peerId') ? [searchParams.get('peerId') as string] : []);
   const [searchQuery, setSearchQuery] = useState('');
   const [transferPriority, setTransferPriority] = useState<'high' | 'normal' | 'low'>('normal');
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Sync selectedPeerId with query param if it changes
+  // Sync selectedPeerIds with query param if it changes
   useEffect(() => {
     const pId = searchParams.get('peerId');
-    if (pId) {
-      setSelectedPeerId(pId);
+    if (pId && !selectedPeerIds.includes(pId)) {
+      setSelectedPeerIds(prev => [...prev, pId]);
     }
   }, [searchParams]);
 
@@ -51,41 +51,52 @@ export default function FilesPage() {
     isPeerConnected
   } = useWebRTC();
 
-  // Trigger connection when a peer is selected
+  // Trigger connection when peers are selected
   useEffect(() => {
-    if (selectedPeerId) {
-      connectToPeer(selectedPeerId);
+    selectedPeerIds.forEach(peerId => {
+      connectToPeer(peerId);
+    });
+  }, [selectedPeerIds, connectToPeer]);
+
+  const processFile = (file: File) => {
+    if (file.size > 200 * 1024 * 1024) {
+      alert("Le fichier est trop volumineux. La limite professionnelle est de 200 Mo.");
+      return;
     }
-  }, [selectedPeerId, connectToPeer]);
+    
+    let sentCount = 0;
+    selectedPeerIds.forEach(peerId => {
+      if (isPeerConnected(peerId)) {
+        sendFile(peerId, file, transferPriority);
+        sentCount++;
+      } else {
+        console.warn(`Appareil ${peerId} non connecté. Transfert ignoré.`);
+      }
+    });
+    
+    if (sentCount < selectedPeerIds.length) {
+      alert("Certains appareils n'étaient pas encore connectés. Le fichier a été envoyé aux appareils prêts.");
+    }
+  };
 
   const handleFileDrop = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
-    if (!selectedPeerId) {
-      alert("Veuillez d'abord sélectionner un appareil destinataire dans la liste.");
-      return;
-    }
-    if (!isPeerConnected(selectedPeerId)) {
-      alert("Veuillez patienter pendant l'établissement de la connexion sécurisée P2P avec cet appareil.");
+    if (selectedPeerIds.length === 0) {
+      alert("Veuillez d'abord sélectionner au moins un appareil destinataire dans la liste.");
       return;
     }
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      const file = e.dataTransfer.files[0];
-      sendFile(selectedPeerId, file, transferPriority);
+      processFile(e.dataTransfer.files[0]);
     }
   };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!selectedPeerId) {
-      alert("Veuillez d'abord sélectionner un appareil destinataire dans la liste.");
-      return;
-    }
-    if (!isPeerConnected(selectedPeerId)) {
-      alert("Veuillez patienter pendant l'établissement de la connexion sécurisée P2P avec cet appareil.");
+    if (selectedPeerIds.length === 0) {
+      alert("Veuillez d'abord sélectionner au moins un appareil destinataire dans la liste.");
       return;
     }
     if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0];
-      sendFile(selectedPeerId, file, transferPriority);
+      processFile(e.target.files[0]);
       e.target.value = ''; // Reset input
     }
   };
@@ -145,14 +156,20 @@ export default function FilesPage() {
             ) : (
               onlinePeers.map(peerId => {
                 const meta = peerMetadata[peerId];
-                const isSelected = selectedPeerId === peerId;
+                const isSelected = selectedPeerIds.includes(peerId);
                 const isConnected = isPeerConnected(peerId);
                 const status = connectionStatus[peerId];
                 
                 return (
                   <button
                     key={peerId}
-                    onClick={() => setSelectedPeerId(peerId)}
+                    onClick={() => {
+                      setSelectedPeerIds(prev => 
+                        prev.includes(peerId) 
+                          ? prev.filter(id => id !== peerId) 
+                          : [...prev, peerId]
+                      );
+                    }}
                     className={`w-full text-left p-3.5 rounded-xl border transition-all ${
                       isSelected 
                         ? 'border-blue-600 bg-blue-50/60 ring-2 ring-blue-500/20' 
@@ -206,14 +223,11 @@ export default function FilesPage() {
           </div>
         </div>
 
-        {selectedPeerId && (
+        {selectedPeerIds.length > 0 && (
           <div className="mt-4 pt-4 border-t border-slate-200 bg-blue-50/30 p-3 rounded-xl border border-blue-100/50">
-            <p className="text-xs text-slate-500">Destinataire sélectionné :</p>
+            <p className="text-xs text-slate-500">Destinataires sélectionnés :</p>
             <p className="font-bold text-blue-800 text-sm mt-0.5">
-              {peerMetadata[selectedPeerId]?.nom_appareil || 'Appareil distant'}
-            </p>
-            <p className="text-[10px] text-slate-500 mt-1 font-semibold">
-              {isPeerConnected(selectedPeerId) ? "✓ Liaison P2P sécurisée établie" : "⚠ Connexion en cours..."}
+              {selectedPeerIds.length} appareil(s)
             </p>
           </div>
         )}
@@ -256,7 +270,7 @@ export default function FilesPage() {
                     <button
                       key={prio}
                       type="button"
-                      disabled={!selectedPeerId}
+                      disabled={selectedPeerIds.length === 0}
                       onClick={() => setTransferPriority(prio)}
                       className={`py-2 px-3 border rounded-xl text-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${
                         isSelected ? activeMap[prio] : colorMap[prio]
@@ -275,12 +289,12 @@ export default function FilesPage() {
             {/* Upload Zone */}
             <div 
               onDragOver={(e) => e.preventDefault()}
-              onDragEnter={(e) => { e.preventDefault(); if (selectedPeerId) setIsDragging(true); }}
+              onDragEnter={(e) => { e.preventDefault(); if (selectedPeerIds.length > 0) setIsDragging(true); }}
               onDragLeave={(e) => { e.preventDefault(); setIsDragging(false); }}
               onDrop={(e) => { setIsDragging(false); handleFileDrop(e); }}
-              onClick={() => selectedPeerId && fileInputRef.current?.click()}
+              onClick={() => selectedPeerIds.length > 0 && fileInputRef.current?.click()}
               className={`border-2 border-dashed rounded-2xl p-8 text-center transition-all duration-300 flex flex-col items-center justify-center ${
-                !selectedPeerId 
+                selectedPeerIds.length === 0 
                   ? 'border-slate-200 bg-slate-50 opacity-60 cursor-not-allowed' 
                   : isDragging
                   ? 'border-blue-500 bg-blue-100/50 scale-[1.02] shadow-lg shadow-blue-500/10 cursor-pointer'
@@ -292,16 +306,17 @@ export default function FilesPage() {
                 ref={fileInputRef}
                 onChange={handleFileSelect}
                 className="hidden"
-                disabled={!selectedPeerId}
+                disabled={selectedPeerIds.length === 0}
+                accept=".mp4,.avi,.mov,.wmv,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.pdf,image/*,audio/*"
               />
               <UploadCloud className={`w-12 h-12 mb-4 transition-transform duration-300 ${
-                selectedPeerId ? (isDragging ? 'text-blue-600 scale-110' : 'text-blue-500') : 'text-slate-400'
+                selectedPeerIds.length > 0 ? (isDragging ? 'text-blue-600 scale-110' : 'text-blue-500') : 'text-slate-400'
               }`} />
               <h4 className="font-bold text-slate-700 mb-1 text-sm">
-                {selectedPeerId ? (isDragging ? "Déposez le fichier maintenant !" : "Glissez un fichier ici") : "Sélectionnez d'abord un appareil"}
+                {selectedPeerIds.length > 0 ? (isDragging ? "Déposez le fichier maintenant !" : "Glissez un fichier ici") : "Sélectionnez d'abord un appareil"}
               </h4>
               <p className="text-xs text-slate-400">
-                {selectedPeerId ? "ou cliquez pour parcourir votre appareil" : "Choisissez un destinataire à gauche pour déverrouiller l'envoi"}
+                {selectedPeerIds.length > 0 ? "ou cliquez pour parcourir votre appareil" : "Choisissez au moins un destinataire à gauche pour déverrouiller l'envoi"}
               </p>
             </div>
 
