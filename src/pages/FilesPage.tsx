@@ -64,19 +64,9 @@ export default function FilesPage() {
       return;
     }
     
-    let sentCount = 0;
     selectedPeerIds.forEach(peerId => {
-      if (isPeerConnected(peerId)) {
-        sendFile(peerId, file, transferPriority);
-        sentCount++;
-      } else {
-        console.warn(`Appareil ${peerId} non connecté. Transfert ignoré.`);
-      }
+      sendFile(peerId, file, transferPriority);
     });
-    
-    if (sentCount < selectedPeerIds.length) {
-      alert("Certains appareils n'étaient pas encore connectés. Le fichier a été envoyé aux appareils prêts.");
-    }
   };
 
   const handleFileDrop = (e: React.DragEvent<HTMLDivElement>) => {
