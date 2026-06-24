@@ -28,10 +28,11 @@ export default function SignalementPage() {
       if (res.ok) {
         setSent(true);
       } else {
-        alert("Erreur serveur lors de l'envoi.");
+        const data = await res.json().catch(() => ({}));
+        alert("Erreur: " + (data.error || "Impossible d'envoyer le signalement sur Telegram. Vérifiez le token ou le Chat ID."));
       }
     } catch (err) {
-      alert("Erreur de connexion. Impossible d'envoyer le signalement.");
+      alert("Erreur de connexion. Impossible de joindre le serveur.");
     } finally {
       setLoading(false);
     }

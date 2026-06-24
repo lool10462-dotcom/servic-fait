@@ -61,20 +61,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     if (!tgData.ok) {
       console.error("Telegram error:", JSON.stringify(tgData));
-      return res.status(200).json({ 
-        success: true, 
+      return res.status(500).json({ 
+        success: false, 
         telegram: false, 
-        note: "Signalement enregistré mais notification Telegram échouée: " + tgData.description 
+        error: "Erreur Telegram: " + tgData.description 
       });
     }
 
     return res.status(200).json({ success: true, telegram: true });
   } catch (error: any) {
     console.error("Fetch error:", error.message);
-    return res.status(200).json({ 
-      success: true, 
+    return res.status(500).json({ 
+      success: false, 
       telegram: false, 
-      note: "Signalement enregistré. Erreur réseau Telegram." 
+      error: "Erreur réseau de l'API Telegram." 
     });
   }
 }
