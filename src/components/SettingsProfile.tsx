@@ -56,7 +56,87 @@ export default function SettingsProfile({
   const [title, setTitle] = useState(techProfile.title);
   const [department, setDepartment] = useState(techProfile.department);
   const [centerName, setCenterName] = useState(techProfile.centerName);
+  const [validatingDept, setValidatingDept] = useState(techProfile.validatingDept || "");
+  const [savedSignature, setSavedSignature] = useState(techProfile.savedSignature || "");
   const [isSaved, setIsSaved] = useState(false);
+
+  const canvasRef = React.useRef<HTMLCanvasElement | null>(null);
+  const [isDrawing, setIsDrawing] = useState(false);
+
+  React.useEffect(() => {
+    if (savedSignature && canvasRef.current) {
+      const canvas = canvasRef.current;
+      const ctx = canvas.getContext("2d");
+      if (ctx) {
+        const img = new window.Image();
+        img.onload = () => {
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        };
+        img.src = savedSignature;
+      }
+    }
+  }, [savedSignature]);
+
+  const startDrawing = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    ctx.strokeStyle = isDark ? "#ffffff" : "#0f172a";
+    ctx.lineWidth = 3;
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+
+    const rect = canvas.getBoundingClientRect();
+    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
+    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
+    const x = clientX - rect.left;
+    const y = clientY - rect.top;
+
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    setIsDrawing(true);
+  };
+
+  const draw = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+    if (!isDrawing) return;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    const rect = canvas.getBoundingClientRect();
+    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
+    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
+    const x = clientX - rect.left;
+    const y = clientY - rect.top;
+
+    ctx.lineTo(x, y);
+    ctx.stroke();
+    e.preventDefault();
+  };
+
+  const stopDrawing = () => {
+    if (!isDrawing) return;
+    setIsDrawing(false);
+    const canvas = canvasRef.current;
+    if (canvas) {
+      setSavedSignature(canvas.toDataURL("image/png"));
+    }
+  };
+
+  const clearSignature = () => {
+    const canvas = canvasRef.current;
+    if (canvas) {
+      const ctx = canvas.getContext("2d");
+      if (ctx) {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+      }
+    }
+    setSavedSignature("");
+  };
 
   const isDark = theme === "dark";
 
@@ -66,7 +146,9 @@ export default function SettingsProfile({
       name: name.trim() || "Technicien Informatique",
       title: title.trim() || "Ingénieur Support CNIPLC",
       department: department.trim() || "Systèmes d'Information (DSI)",
-      centerName: centerName.trim() || "CNIPLC"
+      centerName: centerName.trim() || "CNIPLC",
+      validatingDept: validatingDept.trim() || undefined,
+      savedSignature: savedSignature || undefined
     });
     setIsSaved(true);
     setTimeout(() => setIsSaved(false), 3000);
@@ -171,6 +253,64 @@ export default function SettingsProfile({
                   }`}
                 />
               </div>
+            </div>
+
+            {/* Validating Department */}
+            <div className="space-y-1.5 mt-4">
+              <label className={`block text-xs font-semibold uppercase tracking-wider ${
+                isDark ? "text-slate-300" : "text-slate-700"
+              }`}>
+                Département Validant
+              </label>
+              <input
+                id="settings-tech-validating-dept"
+                type="text"
+                placeholder="ex: Direction des Systèmes d'Information (DSI)"
+                value={validatingDept}
+                onChange={(e) => setValidatingDept(e.target.value)}
+                className={`w-full text-sm px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 ${
+                  isDark ? "bg-slate-950 border-slate-800 text-slate-100 placeholder:text-slate-600" : "bg-white border-slate-200 text-slate-800"
+                }`}
+              />
+              <p className="text-[10px] text-slate-500">
+                Ce département sera affiché sous votre nom dans la zone "L'Informaticien Intervenant" de l'attestation.
+              </p>
+            </div>
+
+            {/* Signature Pad */}
+            <div className="space-y-1.5 mt-4">
+              <label className={`block text-xs font-semibold uppercase tracking-wider ${
+                isDark ? "text-slate-300" : "text-slate-700"
+              }`}>
+                Votre Signature Numérique Persistante
+              </label>
+              <div className="relative">
+                <canvas
+                  ref={canvasRef}
+                  width={400}
+                  height={150}
+                  onMouseDown={startDrawing}
+                  onMouseMove={draw}
+                  onMouseUp={stopDrawing}
+                  onMouseLeave={stopDrawing}
+                  onTouchStart={startDrawing}
+                  onTouchMove={draw}
+                  onTouchEnd={stopDrawing}
+                  className={`border rounded-lg cursor-crosshair w-full h-[150px] touch-none ${
+                    isDark ? "bg-slate-950 border-slate-800" : "bg-slate-50 border-slate-200"
+                  }`}
+                />
+                <button
+                  type="button"
+                  onClick={clearSignature}
+                  className="absolute bottom-2 right-2 bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 text-[10px] font-bold px-2 py-1 rounded transition-colors"
+                >
+                  Effacer
+                </button>
+              </div>
+              <p className="text-[10px] text-slate-500">
+                Dessinez votre signature ci-dessus. Elle sera automatiquement sauvegardée et apposée sur toutes vos fiches.
+              </p>
             </div>
 
             <div className="pt-3 flex items-center justify-between">

@@ -6,7 +6,7 @@
 import React, { useState } from "react";
 import { Intervention, TechProfile, TaskItem, DevicePhoto } from "../types";
 import { DEPARTMENTS, DEVICE_TYPES, TASK_CATEGORIES } from "../data/constants";
-import { Sparkles, Plus, Trash2, Save, AlertTriangle, UploadCloud, Camera, X, Mic, MicOff } from "lucide-react";
+import { Sparkles, Plus, Trash2, Save, AlertTriangle, UploadCloud, Camera, X, Mic, MicOff, Star } from "lucide-react";
 import { GoogleGenAI, Type } from "@google/genai";
 import PhotoCollage from "./PhotoCollage";
 import { Employee, fetchEmployees } from "../lib/supabase";
@@ -46,6 +46,7 @@ export default function NewInterventionForm({
   const [deviceInventory, setDeviceInventory] = useState("");
   const [durationMinutes, setDurationMinutes] = useState(30);
   const [date, setDate] = useState(() => new Date().toISOString().substring(0, 10));
+  const [preferredService, setPreferredService] = useState("");
 
   const [rawNotes, setRawNotes] = useState("");
   const [professionalSummary, setProfessionalSummary] = useState("");
@@ -726,7 +727,10 @@ export default function NewInterventionForm({
         durationMinutes,
         photos,
         batchId: isBatch ? batchId : undefined,
-        signatureDate: status === "termine" ? date : undefined
+        signatureDate: status === "termine" ? date : undefined,
+        preferredService: preferredService || undefined,
+        techSignature: techProfile?.savedSignature || undefined,
+        techValidatingDept: techProfile?.validatingDept || undefined
       }, index, beneficiaryList.length);
     });
 
@@ -742,6 +746,7 @@ export default function NewInterventionForm({
     setPhotos([]);
     setBeneficiaries([]);
     setEditingBeneficiaryIdx(null);
+    setPreferredService("");
   };
 
   return (
@@ -1017,7 +1022,7 @@ export default function NewInterventionForm({
           </div>
         )}
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
           {/* Client Name */}
           <div className="space-y-1.5">
             <label className={`block text-xs font-semibold uppercase tracking-wider ${
@@ -1121,9 +1126,28 @@ export default function NewInterventionForm({
               ))}
             </datalist>
           </div>
+
+          {/* Preferred Service */}
+          <div className="space-y-1.5">
+            <label className={`block text-xs font-semibold uppercase tracking-wider ${
+              isDark ? "text-slate-300" : "text-slate-700"
+            }`}>
+              Service de Préférence (Optionnel)
+            </label>
+            <input
+              id="input-preferred-service"
+              type="text"
+              placeholder="ex: Service Fait Présidence..."
+              value={preferredService}
+              onChange={(e) => setPreferredService(e.target.value)}
+              className={`w-full text-sm px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 ${
+                isDark ? "bg-slate-950 border-slate-800 text-white placeholder:text-slate-650" : "bg-white border-slate-200 text-slate-800"
+              }`}
+            />
+          </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mt-5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-5 mt-5">
           {/* Equipment Type */}
           <div className="space-y-1.5">
             <label className={`block text-xs font-semibold uppercase tracking-wider ${
@@ -1166,6 +1190,34 @@ export default function NewInterventionForm({
                 isDark ? "bg-slate-950 border-slate-800 text-white placeholder:text-slate-650" : "bg-white border-slate-200 text-slate-800"
               }`}
             />
+          </div>
+
+          {/* Service de préférence */}
+          <div className="space-y-1.5">
+            <label className={`block text-xs font-semibold uppercase tracking-wider flex items-center gap-1 ${
+              isDark ? "text-slate-300" : "text-slate-700"
+            }`}>
+              <Star className="w-3.5 h-3.5 text-amber-500" />
+              Service de préférence
+            </label>
+            <select
+              id="select-preferred-service"
+              value={preferredService}
+              onChange={(e) => setPreferredService(e.target.value)}
+              className={`w-full text-sm px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 ${
+                isDark ? "bg-slate-950 border-slate-800 text-white focus:bg-slate-950" : "bg-white border-slate-200 text-slate-800"
+              }`}
+            >
+              <option value="">-- Aucun --</option>
+              <option value="Dépannage Urgent">Dépannage Urgent</option>
+              <option value="Maintenance Préventive">Maintenance Préventive</option>
+              <option value="Installation de Matériel">Installation de Matériel</option>
+              <option value="Configuration Réseau">Configuration Réseau</option>
+              <option value="Assistance Utilisateur">Assistance Utilisateur</option>
+              <option value="Formation Technique">Formation Technique</option>
+              <option value="Audit et Contrôle">Audit et Contrôle</option>
+              <option value="Intervention d'Urgence">Intervention d'Urgence</option>
+            </select>
           </div>
 
           {/* Date */}

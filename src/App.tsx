@@ -346,6 +346,19 @@ export default function App({ embedded = false }: AppProps) {
     }
   };
 
+  const handleUpdateSignature = (interventionId: string, sig: string, dept: string) => {
+    const updatedList = interventions.map(i => 
+      i.id === interventionId 
+        ? { ...i, techSignature: sig, techValidatingDept: dept }
+        : i
+    );
+    setInterventions(updatedList);
+    if (selectedIntervention?.id === interventionId) {
+      setSelectedIntervention(prev => prev ? { ...prev, techSignature: sig, techValidatingDept: dept } : prev);
+    }
+    showToastNotification("Signature numérique apposée avec succès sur la fiche !");
+  };
+
   const handleDeleteIntervention = async (id: string) => {
     const newList = interventions.filter(i => i.id !== id);
     setInterventions(newList);
@@ -642,7 +655,7 @@ export default function App({ embedded = false }: AppProps) {
               <button onClick={() => setSelectedIntervention(null)} className="absolute top-4 right-4 p-1 rounded-full cursor-pointer hover:shadow transition-all z-10 border bg-white border-slate-200 text-slate-405 hover:text-slate-600" title="Masquer">
                 <X className="w-4 h-4" />
               </button>
-              <ProfessionalFiche intervention={selectedIntervention} onPrint={handlePrint} />
+              <ProfessionalFiche intervention={selectedIntervention} onPrint={handlePrint} onUpdateSignature={(sig, dept) => handleUpdateSignature(selectedIntervention.id, sig, dept)} />
             </motion.div>
           )}
         </AnimatePresence>
@@ -831,6 +844,7 @@ export default function App({ embedded = false }: AppProps) {
               <ProfessionalFiche 
                 intervention={selectedIntervention} 
                 onPrint={handlePrint} 
+                onUpdateSignature={(sig, dept) => handleUpdateSignature(selectedIntervention.id, sig, dept)}
               />
             </motion.div>
           )}
@@ -949,6 +963,7 @@ export default function App({ embedded = false }: AppProps) {
           <ProfessionalFiche 
             intervention={selectedIntervention} 
             onPrint={handlePrint} 
+            onUpdateSignature={(sig, dept) => handleUpdateSignature(selectedIntervention.id, sig, dept)}
           />
         </div>
       ) : (

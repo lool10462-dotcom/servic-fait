@@ -32,6 +32,9 @@ export interface Intervention {
   photos?: DevicePhoto[]; // Photos d'intervention avec descriptions
   batchId?: string; // Grouping ID for multi-beneficiary batch saves (links related interventions)
   created_at: string;
+  techSignature?: string; // base64 representation of drawing
+  techValidatingDept?: string; // validating department
+  preferredService?: string; // preferred service name
 }
 
 export interface DevicePhoto {
@@ -45,6 +48,8 @@ export interface TechProfile {
   title: string;
   department: string;
   centerName: string; // e.g., CNIPLC
+  savedSignature?: string; // saved signature base64
+  validatingDept?: string; // default validating department
 }
 
 export interface Statistics {

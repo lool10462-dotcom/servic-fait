@@ -131,6 +131,19 @@ export async function generateAndDownloadPDF(intervention: Intervention, directo
   doc.setTextColor(197, 160, 67);
   doc.text("& ATTESTATION DE SERVICE FAIT", 105, currentY, { align: "center" });
 
+  if (intervention.preferredService) {
+    currentY += 6;
+    doc.setFillColor(240, 253, 250); // Teal-50
+    doc.setDrawColor(204, 251, 241); // Teal-100
+    doc.setLineWidth(0.2);
+    doc.roundedRect(55, currentY - 3.5, 100, 5, 1, 1, "FD");
+    
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(7);
+    doc.setTextColor(15, 118, 110); // Teal-700
+    doc.text(`SERVICE DE PREFERENCE : ${intervention.preferredService.toUpperCase()}`, 105, currentY, { align: "center" });
+  }
+
   // 3. PARTIES GRID BOX
   currentY += 10;
   // Background and border boxes for parties
@@ -163,7 +176,7 @@ export async function generateAndDownloadPDF(intervention: Intervention, directo
   doc.setFontSize(8);
   doc.setTextColor(71, 85, 105);
   doc.text(intervention.techTitle, 19, currentY + 17);
-  doc.text("Département d'Origine : CNIPLC Informatique", 19, currentY + 22);
+  doc.text(`Département Validant : ${intervention.techValidatingDept || "CNIPLC Informatique"}`, 19, currentY + 22);
 
   // Column 2 content
   doc.setFont("helvetica", "bold");
@@ -353,7 +366,7 @@ export async function generateAndDownloadPDF(intervention: Intervention, directo
   currentY += 24;
   
   // Left Block
-  doc.rect(15, currentY, 86, 22);
+  doc.rect(15, currentY, 86, 28);
   doc.setFont("helvetica", "bold");
   doc.setFontSize(7.5);
   doc.setTextColor(15, 23, 42);
@@ -361,13 +374,22 @@ export async function generateAndDownloadPDF(intervention: Intervention, directo
   doc.setFont("helvetica", "normal");
   doc.setFontSize(7);
   doc.setTextColor(100, 116, 139);
-  doc.text("CNIPLC Service de Maintenance", 18, currentY + 8);
-  doc.line(15, currentY + 16, 101, currentY + 16);
-  doc.text(`Date : ${new Date().toLocaleDateString('fr-FR')}`, 17, currentY + 20);
-  doc.text("Signature", 99, currentY + 20, { align: "right" });
+  doc.text(intervention.techValidatingDept || "CNIPLC Informatique", 18, currentY + 8);
+  
+  if (intervention.techSignature) {
+    try {
+      doc.addImage(intervention.techSignature, "PNG", 30, currentY + 9, 56, 12);
+    } catch (err) {
+      console.error("Failed to add tech signature to PDF", err);
+    }
+  }
+
+  doc.line(15, currentY + 22, 101, currentY + 22);
+  doc.text(`Date : ${intervention.signatureDate ? new Date(intervention.signatureDate).toLocaleDateString('fr-FR') : new Date().toLocaleDateString('fr-FR')}`, 17, currentY + 26);
+  doc.text("Signature", 99, currentY + 26, { align: "right" });
 
   // Right Block
-  doc.rect(109, currentY, 86, 22);
+  doc.rect(109, currentY, 86, 28);
   doc.setFont("helvetica", "bold");
   doc.setFontSize(7.5);
   doc.setTextColor(15, 23, 42);
@@ -376,9 +398,15 @@ export async function generateAndDownloadPDF(intervention: Intervention, directo
   doc.setFontSize(7);
   doc.setTextColor(100, 116, 139);
   doc.text(intervention.clientName, 112, currentY + 8);
-  doc.line(109, currentY + 16, 195, currentY + 16);
-  doc.text("Date : ___ / ___ / ______", 111, currentY + 20);
-  doc.text("Prestation Validée", 193, currentY + 20, { align: "right" });
+  if (intervention.preferredService) {
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(6.5);
+    doc.setTextColor(15, 118, 110);
+    doc.text(intervention.preferredService.toUpperCase(), 112, currentY + 11.5);
+  }
+  doc.line(109, currentY + 22, 195, currentY + 22);
+  doc.text("Date : ___ / ___ / ______", 111, currentY + 26);
+  doc.text("Prestation Validée", 193, currentY + 26, { align: "right" });
 
   // Clean save action
   const pdfFileName = `CNIPLC_Intervention_${intervention.refNumber.replace(/\s+/g, "_")}.pdf`;
