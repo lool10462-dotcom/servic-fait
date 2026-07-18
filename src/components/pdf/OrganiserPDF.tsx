@@ -315,11 +315,6 @@ export default function OrganiserPDF({ onBack }: OrganiserPDFProps) {
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6 max-w-7xl mx-auto">
             {pages.map((page, index) => (
               <React.Fragment key={page.id}>
-                {dropIndex === index && dragId && (
-                  <div className="col-span-1 flex items-center justify-center">
-                    <div className="w-2 h-full bg-purple-500 rounded-full animate-pulse shadow-lg" />
-                  </div>
-                )}
                 <div
                   draggable
                   onDragStart={e => handleDragStart(e, page.id)}
@@ -335,6 +330,11 @@ export default function OrganiserPDF({ onBack }: OrganiserPDFProps) {
                         : "border-slate-200 hover:border-purple-300 hover:shadow-xl hover:-translate-y-1"
                   }`}
                 >
+                  {/* Left Drop Indicator (No grid shifting) */}
+                  {dropIndex === index && dragId && dragId !== page.id && (
+                    <div className="absolute left-0 top-0 bottom-0 w-2.5 bg-purple-600 z-30 rounded-l-[14px] shadow-lg shadow-purple-500/50 animate-pulse" />
+                  )}
+
                   {/* Selection check */}
                   {selected.has(page.id) && (
                     <div className="absolute top-3 left-3 z-20 w-7 h-7 rounded-full bg-purple-600 flex items-center justify-center shadow-lg ring-4 ring-white">

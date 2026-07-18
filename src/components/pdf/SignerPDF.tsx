@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { X, Upload, Edit3, Type, Image as ImageIcon, Check, Move, ArrowLeft, Loader, Download } from 'lucide-react';
+import { X, Upload, Edit3, Type, Image as ImageIcon, Check, Move, ArrowLeft, Loader, Download, Trash2 } from 'lucide-react';
 import { PDFDocument } from 'pdf-lib';
 
 type TabType = 'signature' | 'initials' | 'stamp';
@@ -7,7 +7,7 @@ type InputMode = 'text' | 'draw' | 'image';
 type PageMode = 'current' | 'all' | 'custom';
 type ColorType = '#000000' | '#ef4444' | '#3b82f6' | '#22c55e';
 
-interface SignatureConfig {
+interface ElementConfig {
   type: TabType;
   mode: InputMode;
   content: string | null;
@@ -15,6 +15,8 @@ interface SignatureConfig {
   font?: string;
   pageMode: PageMode;
   customPages?: string;
+  x: number;
+  y: number;
 }
 
 interface SignerPDFProps {
@@ -23,8 +25,13 @@ interface SignerPDFProps {
 
 export default function SignerPDF({ onBack }: SignerPDFProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [appliedSignature, setAppliedSignature] = useState<SignatureConfig | null>(null);
+  const [modalTab, setModalTab] = useState<TabType>('signature');
   
+  // Three separate element configs
+  const [sigConfig, setSigConfig] = useState<ElementConfig | null>(null);
+  const [initialsConfig, setInitialsConfig] = useState<ElementConfig | null>(null);
+  const [stampConfig, setStampConfig] = useState<ElementConfig | null>(null);
+
   // PDF states
   const [pdfFile, setPdfFile] = useState<File | null>(null);
   const [pdfBuffer, setPdfBuffer] = useState<ArrayBuffer | null>(null);
@@ -34,14 +41,20 @@ export default function SignerPDF({ onBack }: SignerPDFProps) {
   const [progress, setProgress] = useState("");
   
   // Dragging states
-  const [position, setPosition] = useState({ x: 100, y: 100 });
   const [isDragging, setIsDragging] = useState(false);
+  const [draggingElement, setDraggingElement] = useState<TabType | null>(null);
   const dragRef = useRef<{ startX: number; startY: number; initX: number; initY: number } | null>(null);
   const pageContainerRef = useRef<HTMLDivElement>(null);
   const initialFileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleApply = (config: SignatureConfig) => {
-    setAppliedSignature(config);
+  const handleApplyElement = (config: ElementConfig) => {
+    if (config.type === 'signature') {
+      setSigConfig(config);
+    } else if (config.type === 'initials') {
+      setInitialsConfig(config);
+    } else if (config.type === 'stamp') {
+      setStampConfig(config);
+    }
     setIsModalOpen(false);
   };
 
@@ -84,7 +97,11 @@ export default function SignerPDF({ onBack }: SignerPDFProps) {
 
       setPdfPages(pagesData);
       setCurrentPage(0);
-      setPosition({ x: 50, y: 50 });
+      
+      // Reset configurations
+      setSigConfig(null);
+      setInitialsConfig(null);
+      setStampConfig(null);
     } catch (err) {
       console.error(err);
       alert("Une erreur est survenue lors de la lecture du document PDF.");
@@ -94,19 +111,25 @@ export default function SignerPDF({ onBack }: SignerPDFProps) {
     }
   };
 
-  const handleMouseDown = (e: React.MouseEvent) => {
-    setIsDragging(true);
+  const handleMouseDown = (e: React.MouseEvent, type: TabType) => {
+    setDraggingElement(type);
+    let initPos = { x: 50, y: 50 };
+    if (type === 'signature' && sigConfig) initPos = { x: sigConfig.x, y: sigConfig.y };
+    else if (type === 'initials' && initialsConfig) initPos = { x: initialsConfig.x, y: initialsConfig.y };
+    else if (type === 'stamp' && stampConfig) initPos = { x: stampConfig.x, y: stampConfig.y };
+
     dragRef.current = {
       startX: e.clientX,
       startY: e.clientY,
-      initX: position.x,
-      initY: position.y
+      initX: initPos.x,
+      initY: initPos.y
     };
+    setIsDragging(true);
     e.stopPropagation();
   };
 
   const handleMouseMove = (e: React.MouseEvent) => {
-    if (!isDragging || !dragRef.current || !pageContainerRef.current) return;
+    if (!isDragging || !dragRef.current || !pageContainerRef.current || !draggingElement) return;
     const dx = e.clientX - dragRef.current.startX;
     const dy = e.clientY - dragRef.current.startY;
     
@@ -114,105 +137,131 @@ export default function SignerPDF({ onBack }: SignerPDFProps) {
     
     // Bounds check
     const newX = Math.max(0, Math.min(containerRect.width - 150, dragRef.current.initX + dx));
-    const newY = Math.max(0, Math.min(containerRect.height - 60, dragRef.current.initY + dy));
+    const newY = Math.max(0, Math.min(containerRect.height - 80, dragRef.current.initY + dy));
     
-    setPosition({ x: newX, y: newY });
+    if (draggingElement === 'signature') {
+      setSigConfig(prev => prev ? { ...prev, x: newX, y: newY } : null);
+    } else if (draggingElement === 'initials') {
+      setInitialsConfig(prev => prev ? { ...prev, x: newX, y: newY } : null);
+    } else if (draggingElement === 'stamp') {
+      setStampConfig(prev => prev ? { ...prev, x: newX, y: newY } : null);
+    }
   };
 
   const handleMouseUp = () => {
     setIsDragging(false);
+    setDraggingElement(null);
+  };
+
+  const handleRemoveElement = (type: TabType) => {
+    if (type === 'signature') setSigConfig(null);
+    else if (type === 'initials') setInitialsConfig(null);
+    else if (type === 'stamp') setStampConfig(null);
   };
 
   const handleSaveSignedPDF = async () => {
-    if (!pdfBuffer || !appliedSignature || pdfPages.length === 0 || !pageContainerRef.current) return;
+    if (!pdfBuffer || pdfPages.length === 0 || !pageContainerRef.current) return;
+    if (!sigConfig && !initialsConfig && !stampConfig) {
+      alert("Veuillez configurer et placer au moins un élément graphique.");
+      return;
+    }
     setLoading(true);
-    setProgress("Fusion de la signature dans le PDF...");
+    setProgress("Génération du PDF signé...");
 
     try {
       const pdfDoc = await PDFDocument.load(pdfBuffer);
       const totalPagesCount = pdfDoc.getPageCount();
 
-      // Determine which pages to apply signature on
-      const pagesToSign: number[] = [];
-      if (appliedSignature.pageMode === 'current') {
-        pagesToSign.push(currentPage);
-      } else if (appliedSignature.pageMode === 'all') {
-        for (let i = 0; i < totalPagesCount; i++) pagesToSign.push(i);
-      } else if (appliedSignature.pageMode === 'custom' && appliedSignature.customPages) {
-        for (const part of appliedSignature.customPages.split(',')) {
-          const trimmed = part.trim();
-          if (trimmed.includes('-')) {
-            const [from, to] = trimmed.split('-').map(n => Math.max(0, parseInt(n.trim()) - 1));
-            for (let i = from; i <= Math.min(to, totalPagesCount - 1); i++) pagesToSign.push(i);
-          } else {
-            const idx = parseInt(trimmed) - 1;
-            if (idx >= 0 && idx < totalPagesCount) pagesToSign.push(idx);
-          }
-        }
-      }
-
-      // Convert signature screen coordinates to PDF points coordinates
       const container = pageContainerRef.current;
       const containerWidth = container.clientWidth;
       const containerHeight = container.clientHeight;
 
-      const xPct = position.x / containerWidth;
-      const yPct = position.y / containerHeight;
+      const getPagesForElement = (config: ElementConfig): number[] => {
+        const pagesToSign: number[] = [];
+        if (config.pageMode === 'current') {
+          pagesToSign.push(currentPage);
+        } else if (config.pageMode === 'all') {
+          for (let i = 0; i < totalPagesCount; i++) pagesToSign.push(i);
+        } else if (config.pageMode === 'custom' && config.customPages) {
+          for (const part of config.customPages.split(',')) {
+            const trimmed = part.trim();
+            if (trimmed.includes('-')) {
+              const [from, to] = trimmed.split('-').map(n => Math.max(0, parseInt(n.trim()) - 1));
+              for (let i = from; i <= Math.min(to, totalPagesCount - 1); i++) pagesToSign.push(i);
+            } else {
+              const idx = parseInt(trimmed) - 1;
+              if (idx >= 0 && idx < totalPagesCount) pagesToSign.push(idx);
+            }
+          }
+        }
+        return pagesToSign;
+      };
 
-      // Get signature image as buffer if it's draw or image
-      let embeddedSigImage: any = null;
-      let signatureType: 'image' | 'text' = 'text';
-      let signatureDataUrl: string | null = null;
-
-      if (appliedSignature.mode === 'draw' && appliedSignature.content) {
-        signatureType = 'image';
-        signatureDataUrl = appliedSignature.content;
-      } else if (appliedSignature.mode === 'image' && appliedSignature.content) {
-        signatureType = 'image';
-        signatureDataUrl = appliedSignature.content;
-      } else if (appliedSignature.type === 'stamp' && appliedSignature.content) {
-        signatureType = 'image';
-        signatureDataUrl = appliedSignature.content;
-      }
-
-      if (signatureType === 'image' && signatureDataUrl) {
-        const sigResponse = await fetch(signatureDataUrl);
-        const sigImageBuffer = await sigResponse.arrayBuffer();
-        embeddedSigImage = await pdfDoc.embedPng(sigImageBuffer);
-      }
-
-      for (const pageIdx of pagesToSign) {
+      const drawElementOnPage = async (pageIdx: number, config: ElementConfig, type: TabType) => {
         const page = pdfDoc.getPage(pageIdx);
         const { width: pdfWidth, height: pdfHeight } = page.getSize();
 
-        // Calculate mapped coordinates
+        const xPct = config.x / containerWidth;
+        const yPct = config.y / containerHeight;
+
+        // Calculate coordinates mapping top-left coordinates to bottom-left PDF coordinates
         const pdfX = xPct * pdfWidth;
-        // Flip Y-axis (PDF goes from bottom up, screen goes from top down)
-        const elementHeightPct = 50 / containerHeight; // approximate height
+        const elementHeightPct = 60 / containerHeight; // Approximate element height proportion
         const pdfY = (1 - yPct - elementHeightPct) * pdfHeight;
 
-        if (signatureType === 'image' && embeddedSigImage) {
-          // Draw signature image
-          page.drawImage(embeddedSigImage, {
+        if (config.mode === 'image' && config.content) {
+          const response = await fetch(config.content);
+          const imageBuffer = await response.arrayBuffer();
+          const embeddedImage = config.content.includes('image/png') || config.content.startsWith('data:image/png')
+            ? await pdfDoc.embedPng(imageBuffer)
+            : await pdfDoc.embedJpg(imageBuffer);
+
+          const widthScale = type === 'stamp' ? 120 : 100;
+          const heightScale = type === 'stamp' ? 120 : 40;
+
+          page.drawImage(embeddedImage, {
             x: pdfX,
             y: pdfY,
-            width: 100 * (pdfWidth / containerWidth),
-            height: 40 * (pdfHeight / containerHeight)
+            width: widthScale * (pdfWidth / containerWidth),
+            height: heightScale * (pdfHeight / containerHeight)
           });
-        } else {
-          // Draw plain text signature
-          page.drawText(appliedSignature.content || 'Signature', {
+        } else if (config.content) {
+          page.drawText(config.content, {
             x: pdfX,
             y: pdfY,
-            size: 14,
-            color: appliedSignature.color === '#ef4444' ? 
+            size: type === 'initials' ? 18 : 14,
+            color: config.color === '#ef4444' ? 
               require('pdf-lib').rgb(0.9, 0.1, 0.1) : 
-              appliedSignature.color === '#3b82f6' ?
+              config.color === '#3b82f6' ?
               require('pdf-lib').rgb(0.1, 0.5, 0.9) : 
-              appliedSignature.color === '#22c55e' ?
+              config.color === '#22c55e' ?
               require('pdf-lib').rgb(0.1, 0.7, 0.2) : 
               require('pdf-lib').rgb(0, 0, 0)
           });
+        }
+      };
+
+      // Apply Signature
+      if (sigConfig) {
+        const pagesToSign = getPagesForElement(sigConfig);
+        for (const idx of pagesToSign) {
+          await drawElementOnPage(idx, sigConfig, 'signature');
+        }
+      }
+
+      // Apply Initials
+      if (initialsConfig) {
+        const pagesToSign = getPagesForElement(initialsConfig);
+        for (const idx of pagesToSign) {
+          await drawElementOnPage(idx, initialsConfig, 'initials');
+        }
+      }
+
+      // Apply Stamp
+      if (stampConfig) {
+        const pagesToSign = getPagesForElement(stampConfig);
+        for (const idx of pagesToSign) {
+          await drawElementOnPage(idx, stampConfig, 'stamp');
         }
       }
 
@@ -226,13 +275,19 @@ export default function SignerPDF({ onBack }: SignerPDFProps) {
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
+      onBack();
     } catch (err) {
       console.error(err);
-      alert("Une erreur est survenue lors de l'intégration de la signature.");
+      alert("Une erreur est survenue lors de l'intégration des signatures.");
     } finally {
       setLoading(false);
       setProgress("");
     }
+  };
+
+  const openConfigModal = (tab: TabType) => {
+    setModalTab(tab);
+    setIsModalOpen(true);
   };
 
   return (
@@ -255,16 +310,31 @@ export default function SignerPDF({ onBack }: SignerPDFProps) {
         {pdfPages.length > 0 && (
           <div className="flex items-center space-x-2.5">
             <button
-              onClick={() => setIsModalOpen(true)}
-              className="bg-purple-600 hover:bg-purple-700 text-white px-5 py-2 rounded-xl font-medium shadow-sm transition-colors flex items-center space-x-2 cursor-pointer"
+              onClick={() => openConfigModal('signature')}
+              className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-xl font-medium shadow-sm transition-colors flex items-center space-x-2 cursor-pointer text-xs uppercase tracking-wider font-bold"
             >
               <Edit3 className="w-4 h-4" />
-              <span>Configurer la signature</span>
+              <span>Signature</span>
             </button>
-            {appliedSignature && (
+            <button
+              onClick={() => openConfigModal('initials')}
+              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl font-medium shadow-sm transition-colors flex items-center space-x-2 cursor-pointer text-xs uppercase tracking-wider font-bold"
+            >
+              <Edit3 className="w-4 h-4" />
+              <span>Initiales</span>
+            </button>
+            <button
+              onClick={() => openConfigModal('stamp')}
+              className="bg-amber-600 hover:bg-amber-700 text-white px-4 py-2 rounded-xl font-medium shadow-sm transition-colors flex items-center space-x-2 cursor-pointer text-xs uppercase tracking-wider font-bold"
+            >
+              <Edit3 className="w-4 h-4" />
+              <span>Tampon</span>
+            </button>
+            
+            {(sigConfig || initialsConfig || stampConfig) && (
               <button
                 onClick={handleSaveSignedPDF}
-                className="bg-red-600 hover:bg-red-700 text-white px-5 py-2 rounded-xl font-bold shadow-sm transition-colors flex items-center space-x-2 cursor-pointer"
+                className="bg-red-650 hover:bg-red-750 text-white px-5 py-2 rounded-xl font-bold shadow-md transition-all flex items-center space-x-2 cursor-pointer text-xs uppercase tracking-wider"
               >
                 <Download className="w-4 h-4" />
                 <span>Télécharger</span>
@@ -290,7 +360,7 @@ export default function SignerPDF({ onBack }: SignerPDFProps) {
             </div>
             <div className="text-center">
               <h3 className="text-lg font-bold text-slate-800 mb-1">Chargez le PDF à signer</h3>
-              <p className="text-slate-500 text-sm max-w-sm">Le document restera local sur votre ordinateur pour un maximum de sécurité.</p>
+              <p className="text-slate-500 text-sm max-w-sm">Vous pourrez insérer simultanément une signature, des initiales et un tampon.</p>
             </div>
             <button onClick={() => initialFileInputRef.current?.click()} className="flex items-center gap-2 px-6 py-3 bg-purple-600 hover:bg-purple-700 rounded-xl text-white font-bold cursor-pointer transition-all shadow-md">
               <span>Sélectionner le PDF</span>
@@ -321,7 +391,7 @@ export default function SignerPDF({ onBack }: SignerPDFProps) {
             {/* Draggable container area */}
             <div 
               ref={pageContainerRef}
-              className="bg-white shadow-xl relative border border-gray-200"
+              className="bg-white shadow-xl relative border border-gray-200 select-none"
               style={{ width: '600px', height: `${600 * (pdfPages[currentPage].height / pdfPages[currentPage].width)}px` }}
             >
               <img 
@@ -331,32 +401,81 @@ export default function SignerPDF({ onBack }: SignerPDFProps) {
               />
               
               {/* Draggable Signature Overlay */}
-              {appliedSignature && (
+              {sigConfig && (
                 <div
-                  style={{ left: `${position.x}px`, top: `${position.y}px` }}
-                  className={`absolute cursor-move border-2 ${isDragging ? 'border-purple-500 bg-purple-50/50' : 'border-dashed border-purple-400 bg-white/70'} p-2 rounded flex flex-col items-center justify-center group z-50`}
-                  onMouseDown={handleMouseDown}
+                  style={{ left: `${sigConfig.x}px`, top: `${sigConfig.y}px` }}
+                  className={`absolute cursor-move border-2 ${isDragging && draggingElement === 'signature' ? 'border-purple-500 bg-purple-50/50' : 'border-dashed border-purple-400 bg-white/80'} p-2 rounded flex flex-col items-center justify-center group z-50`}
+                  onMouseDown={e => handleMouseDown(e, 'signature')}
                 >
-                  <div className="absolute -top-3 -right-3 bg-white p-1 rounded-full shadow border border-gray-200 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <Move className="w-3.5 h-3.5 text-gray-500" />
+                  <button 
+                    onClick={(e) => { e.stopPropagation(); handleRemoveElement('signature'); }} 
+                    className="absolute -top-2.5 -right-2.5 bg-red-100 border border-red-200 hover:bg-red-200 text-red-600 rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity shadow-sm"
+                  >
+                    <Trash2 className="w-3 h-3" />
+                  </button>
+                  <div className="absolute top-1 right-1 opacity-20 group-hover:opacity-85 pointer-events-none">
+                    <Move className="w-3 h-3 text-slate-650" />
                   </div>
                   
-                  {appliedSignature.mode === 'text' && (
+                  {sigConfig.mode === 'text' && (
                     <span 
-                      style={{ color: appliedSignature.color, fontFamily: appliedSignature.font }} 
+                      style={{ color: sigConfig.color, fontFamily: sigConfig.font }} 
                       className="text-2xl whitespace-nowrap px-3 py-1.5 select-none"
                     >
-                      {appliedSignature.content || 'Signature'}
+                      {sigConfig.content || 'Signature'}
                     </span>
                   )}
-                  {appliedSignature.mode === 'draw' && appliedSignature.content && (
-                    <img src={appliedSignature.content} alt="Signature tracée" className="max-h-16 pointer-events-none select-none" />
+                  {sigConfig.mode === 'draw' && sigConfig.content && (
+                    <img src={sigConfig.content} alt="Signature tracée" className="max-h-16 pointer-events-none select-none" />
                   )}
-                  {appliedSignature.mode === 'image' && appliedSignature.content && (
-                    <img src={appliedSignature.content} alt="Signature importée" className="max-h-20 pointer-events-none select-none" />
-                  )}
-                  {appliedSignature.type === 'stamp' && appliedSignature.content && (
-                    <img src={appliedSignature.content} alt="Tampon" className="max-h-24 opacity-90 pointer-events-none mix-blend-multiply select-none" />
+                </div>
+              )}
+
+              {/* Draggable Initials Overlay */}
+              {initialsConfig && (
+                <div
+                  style={{ left: `${initialsConfig.x}px`, top: `${initialsConfig.y}px` }}
+                  className={`absolute cursor-move border-2 ${isDragging && draggingElement === 'initials' ? 'border-blue-500 bg-blue-50/50' : 'border-dashed border-blue-400 bg-white/80'} p-2 rounded flex flex-col items-center justify-center group z-50`}
+                  onMouseDown={e => handleMouseDown(e, 'initials')}
+                >
+                  <button 
+                    onClick={(e) => { e.stopPropagation(); handleRemoveElement('initials'); }} 
+                    className="absolute -top-2.5 -right-2.5 bg-red-100 border border-red-200 hover:bg-red-200 text-red-600 rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity shadow-sm"
+                  >
+                    <Trash2 className="w-3 h-3" />
+                  </button>
+                  <div className="absolute top-1 right-1 opacity-20 group-hover:opacity-85 pointer-events-none">
+                    <Move className="w-3 h-3 text-slate-650" />
+                  </div>
+                  
+                  <span 
+                    style={{ color: initialsConfig.color, fontFamily: initialsConfig.font }} 
+                    className="text-xl font-bold whitespace-nowrap px-4 py-1 select-none"
+                  >
+                    {initialsConfig.content || 'Initials'}
+                  </span>
+                </div>
+              )}
+
+              {/* Draggable Stamp Overlay */}
+              {stampConfig && (
+                <div
+                  style={{ left: `${stampConfig.x}px`, top: `${stampConfig.y}px` }}
+                  className={`absolute cursor-move border-2 ${isDragging && draggingElement === 'stamp' ? 'border-amber-500 bg-amber-50/50' : 'border-dashed border-amber-400 bg-white/80'} p-2 rounded flex flex-col items-center justify-center group z-50`}
+                  onMouseDown={e => handleMouseDown(e, 'stamp')}
+                >
+                  <button 
+                    onClick={(e) => { e.stopPropagation(); handleRemoveElement('stamp'); }} 
+                    className="absolute -top-2.5 -right-2.5 bg-red-100 border border-red-200 hover:bg-red-200 text-red-600 rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity shadow-sm"
+                  >
+                    <Trash2 className="w-3 h-3" />
+                  </button>
+                  <div className="absolute top-1 right-1 opacity-20 group-hover:opacity-85 pointer-events-none">
+                    <Move className="w-3 h-3 text-slate-650" />
+                  </div>
+                  
+                  {stampConfig.content && (
+                    <img src={stampConfig.content} alt="Tampon" className="max-h-24 opacity-90 pointer-events-none mix-blend-multiply select-none" />
                   )}
                 </div>
               )}
@@ -368,8 +487,9 @@ export default function SignerPDF({ onBack }: SignerPDFProps) {
       {/* Modal Overlay */}
       {isModalOpen && (
         <SignatureModal 
+          activeType={modalTab}
           onClose={() => setIsModalOpen(false)} 
-          onApply={handleApply} 
+          onApply={handleApplyElement} 
         />
       )}
     </div>
@@ -378,14 +498,15 @@ export default function SignerPDF({ onBack }: SignerPDFProps) {
 
 // ── Reusable Modal for Signature Configuration ─────────────────
 interface SignatureModalProps {
+  activeType: TabType;
   onClose: () => void;
-  onApply: (config: SignatureConfig) => void;
+  onApply: (config: ElementConfig) => void;
 }
 
-function SignatureModal({ onClose, onApply }: SignatureModalProps) {
+function SignatureModal({ activeType, onClose, onApply }: SignatureModalProps) {
   const [fullName, setFullName] = useState('Jean Dupont');
   const [initialsText, setInitialsText] = useState('JD');
-  const [activeTab, setActiveTab] = useState<TabType>('signature');
+  const [activeTab, setActiveTab] = useState<TabType>(activeType);
   const [inputMode, setInputMode] = useState<InputMode>('text');
   const [color, setColor] = useState<ColorType>('#000000');
   const [font, setFont] = useState<string>('"Brush Script MT", "Segoe Print", cursive');
@@ -475,24 +596,29 @@ function SignatureModal({ onClose, onApply }: SignatureModalProps) {
 
   const handleSave = () => {
     let content: string | null = null;
+    let finalMode: InputMode = inputMode;
 
     if (activeTab === 'signature') {
       if (inputMode === 'text') content = fullName;
       else if (inputMode === 'draw') content = drawnImage;
     } else if (activeTab === 'initials') {
       content = initialsText;
+      finalMode = 'text';
     } else if (activeTab === 'stamp') {
       content = stampImage;
+      finalMode = 'image';
     }
 
     onApply({
       type: activeTab,
-      mode: activeTab === 'stamp' ? 'image' : inputMode,
+      mode: finalMode,
       content,
       color,
       font,
       pageMode,
-      customPages
+      customPages,
+      x: activeTab === 'signature' ? 50 : activeTab === 'initials' ? 250 : 450,
+      y: 100
     });
   };
 
@@ -502,7 +628,7 @@ function SignatureModal({ onClose, onApply }: SignatureModalProps) {
         <div className="flex items-center justify-between border-b border-slate-100 pb-3">
           <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
             <Edit3 className="w-5 h-5 text-purple-650" />
-            Configurer l'Élément Graphique
+            <span>Configurer l'Élément ({activeTab === 'signature' ? 'Signature' : activeTab === 'initials' ? 'Initiales' : 'Tampon'})</span>
           </h3>
           <button onClick={onClose} className="p-1 rounded-lg hover:bg-slate-100 text-slate-400 transition-colors cursor-pointer">
             <X className="w-5 h-5" />
@@ -531,8 +657,8 @@ function SignatureModal({ onClose, onApply }: SignatureModalProps) {
               <button
                 type="button"
                 onClick={() => setInputMode('text')}
-                className={`flex-1 py-2 border rounded-xl text-xs font-semibold cursor-pointer ${
-                  inputMode === 'text' ? 'border-purple-600 bg-purple-50 text-purple-700' : 'border-slate-200 text-slate-600'
+                className={`flex-1 py-2 border rounded-xl text-xs font-semibold cursor-pointer transition-colors ${
+                  inputMode === 'text' ? 'border-purple-600 bg-purple-50 text-purple-700 font-bold' : 'border-slate-200 text-slate-650 hover:bg-slate-50'
                 }`}
               >
                 Saisir du texte
@@ -540,8 +666,8 @@ function SignatureModal({ onClose, onApply }: SignatureModalProps) {
               <button
                 type="button"
                 onClick={() => setInputMode('draw')}
-                className={`flex-1 py-2 border rounded-xl text-xs font-semibold cursor-pointer ${
-                  inputMode === 'draw' ? 'border-purple-600 bg-purple-50 text-purple-700' : 'border-slate-200 text-slate-600'
+                className={`flex-1 py-2 border rounded-xl text-xs font-semibold cursor-pointer transition-colors ${
+                  inputMode === 'draw' ? 'border-purple-600 bg-purple-50 text-purple-700 font-bold' : 'border-slate-200 text-slate-650 hover:bg-slate-50'
                 }`}
               >
                 Dessiner la signature
@@ -554,7 +680,7 @@ function SignatureModal({ onClose, onApply }: SignatureModalProps) {
                   type="text"
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
-                  className="w-full text-sm px-3 py-2 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  className="w-full text-sm px-3 py-2 border border-slate-250 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500"
                   placeholder="Saisissez votre nom..."
                 />
                 <div className="grid grid-cols-2 gap-3">
@@ -564,7 +690,7 @@ function SignatureModal({ onClose, onApply }: SignatureModalProps) {
                       onClick={() => setFont(f.value)}
                       style={{ fontFamily: f.value }}
                       className={`p-3 border rounded-xl text-lg text-center cursor-pointer transition-all ${
-                        font === f.value ? 'border-purple-500 bg-purple-50/50 font-bold' : 'border-slate-100 hover:bg-slate-50'
+                        font === f.value ? 'border-purple-500 bg-purple-50/50 font-bold shadow-sm' : 'border-slate-150 hover:bg-slate-50'
                       }`}
                     >
                       {fullName || 'Signature'}
@@ -583,12 +709,12 @@ function SignatureModal({ onClose, onApply }: SignatureModalProps) {
                     onMouseMove={draw}
                     onMouseUp={stopDrawing}
                     onMouseLeave={stopDrawing}
-                    className="border border-slate-200 rounded-xl cursor-crosshair w-full h-[150px] bg-slate-50 touch-none"
+                    className="border border-slate-200 rounded-xl cursor-crosshair w-full h-[150px] bg-slate-50 touch-none shadow-inner"
                   />
                   <button
                     type="button"
                     onClick={clearCanvas}
-                    className="absolute bottom-2 right-2 bg-red-50 hover:bg-red-100 text-red-650 text-[10px] font-bold px-2 py-1 rounded border border-red-200"
+                    className="absolute bottom-2 right-2 bg-red-50 hover:bg-red-100 text-red-650 text-[10px] font-bold px-2 py-1 rounded border border-red-200 transition-colors"
                   >
                     Effacer
                   </button>
@@ -598,27 +724,29 @@ function SignatureModal({ onClose, onApply }: SignatureModalProps) {
           </div>
         )}
 
+        {/* Tab Contents Initials */}
         {activeTab === 'initials' && (
           <div className="space-y-3">
-            <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">Initiales</label>
+            <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">Vos Initiales</label>
             <input
               type="text"
               value={initialsText}
               onChange={(e) => setInitialsText(e.target.value.substring(0, 3))}
-              className="w-24 text-center text-sm px-3 py-2 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500"
+              className="w-24 text-center text-sm px-3 py-2 border border-slate-250 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 font-bold uppercase"
               placeholder="ex: JD"
             />
           </div>
         )}
 
+        {/* Tab Contents Stamp */}
         {activeTab === 'stamp' && (
           <div className="space-y-3">
-            <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">Charger une image (PNG / JPG)</label>
+            <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">Image du tampon (PNG transparent recommandé)</label>
             <div className="flex items-center gap-4">
               <button
                 type="button"
                 onClick={() => document.getElementById('stamp-file-input')?.click()}
-                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl cursor-pointer"
+                className="px-4 py-2.5 bg-slate-100 hover:bg-slate-250 text-slate-750 text-xs font-bold rounded-xl cursor-pointer transition-colors border border-slate-200 shadow-sm"
               >
                 Sélectionner l'image
               </button>
@@ -629,10 +757,10 @@ function SignatureModal({ onClose, onApply }: SignatureModalProps) {
                 onChange={handleStampUpload}
                 className="hidden"
               />
-              {stampImage && <span className="text-xs text-green-600 font-semibold flex items-center">✓ Chargé</span>}
+              {stampImage && <span className="text-xs text-green-600 font-bold flex items-center gap-1">✓ Image importée</span>}
             </div>
             {stampImage && (
-              <div className="w-24 h-24 border rounded-xl overflow-hidden p-1 flex items-center justify-center bg-slate-50">
+              <div className="w-28 h-28 border rounded-xl overflow-hidden p-2 flex items-center justify-center bg-slate-50 shadow-inner">
                 <img src={stampImage} alt="Stamp Preview" className="max-w-full max-h-full object-contain" />
               </div>
             )}
@@ -650,7 +778,7 @@ function SignatureModal({ onClose, onApply }: SignatureModalProps) {
                   onClick={() => setColor(c)}
                   style={{ backgroundColor: c }}
                   className={`w-8 h-8 rounded-full border-2 cursor-pointer transition-all ${
-                    color === c ? 'border-purple-600 scale-110 shadow' : 'border-transparent'
+                    color === c ? 'border-purple-655 scale-110 shadow-md ring-2 ring-purple-200' : 'border-transparent hover:scale-105 shadow-sm'
                   }`}
                 />
               ))}
@@ -660,18 +788,18 @@ function SignatureModal({ onClose, onApply }: SignatureModalProps) {
 
         <div className="space-y-2.5">
           <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">Appliquer sur les pages</label>
-          <div className="flex gap-3">
+          <div className="flex gap-4">
             <label className="flex items-center gap-1.5 text-xs text-slate-650 cursor-pointer">
-              <input type="radio" checked={pageMode === 'current'} onChange={() => setPageMode('current')} />
-              <span>Page Actuelle</span>
+              <input type="radio" checked={pageMode === 'current'} onChange={() => setPageMode('current')} className="accent-purple-650 w-4 h-4" />
+              <span className="font-medium">Page Actuelle</span>
             </label>
             <label className="flex items-center gap-1.5 text-xs text-slate-650 cursor-pointer">
-              <input type="radio" checked={pageMode === 'all'} onChange={() => setPageMode('all')} />
-              <span>Toutes les pages</span>
+              <input type="radio" checked={pageMode === 'all'} onChange={() => setPageMode('all')} className="accent-purple-650 w-4 h-4" />
+              <span className="font-medium">Toutes les pages</span>
             </label>
             <label className="flex items-center gap-1.5 text-xs text-slate-650 cursor-pointer">
-              <input type="radio" checked={pageMode === 'custom'} onChange={() => setPageMode('custom')} />
-              <span>Plage personnalisée</span>
+              <input type="radio" checked={pageMode === 'custom'} onChange={() => setPageMode('custom')} className="accent-purple-650 w-4 h-4" />
+              <span className="font-medium">Plage personnalisée</span>
             </label>
           </div>
           {pageMode === 'custom' && (
@@ -680,7 +808,7 @@ function SignatureModal({ onClose, onApply }: SignatureModalProps) {
               placeholder="ex: 1-3, 5"
               value={customPages}
               onChange={(e) => setCustomPages(e.target.value)}
-              className="w-full text-sm px-3 py-1.5 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 mt-1"
+              className="w-full text-sm px-3 py-2 border border-slate-250 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 mt-1"
             />
           )}
         </div>
@@ -697,9 +825,9 @@ function SignatureModal({ onClose, onApply }: SignatureModalProps) {
           <button
             type="button"
             onClick={handleSave}
-            className="px-5 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold transition-colors shadow-md cursor-pointer"
+            className="px-5 py-2.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold transition-all shadow-md cursor-pointer"
           >
-            Appliquer
+            Appliquer l'élément
           </button>
         </div>
       </div>

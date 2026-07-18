@@ -5,7 +5,7 @@ import {
   Columns, Shield, Unlock, Lock, Droplets
 } from 'lucide-react';
 import { PDFDocument, degrees, rgb, StandardFonts } from 'pdf-lib';
-import { Document, Packer, Paragraph, TextRun } from 'docx';
+import { Document, Packer, Paragraph, TextRun, ImageRun } from 'docx';
 
 interface ConvertPDFProps {
   type: string;
@@ -96,7 +96,7 @@ async function pdfToJpgImages(arrayBuffer: ArrayBuffer): Promise<{ dataUrl: stri
   return results;
 }
 
-// ── PDF-to-Word using docx (native .docx generation) ─────────
+// ── PDF-to-Word using docx (high-fidelity image embedding for 100% preservation) ─────────
 async function pdfToWord(arrayBuffer: ArrayBuffer, filename: string): Promise<void> {
   const pdfjsLib = await import('pdfjs-dist');
   pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
@@ -109,59 +109,34 @@ async function pdfToWord(arrayBuffer: ArrayBuffer, filename: string): Promise<vo
 
   for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
     const page = await pdf.getPage(pageNum);
-    const textContent = await page.getTextContent();
-    const viewport = page.getViewport({ scale: 1 });
+    const viewport = page.getViewport({ scale: 2.0 }); // High-resolution render
+    const canvas = document.createElement('canvas');
+    canvas.width = viewport.width;
+    canvas.height = viewport.height;
+    const ctx = canvas.getContext('2d')!;
+    
+    // Fill canvas background with white
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    
+    await page.render({ canvasContext: ctx, viewport } as any).promise;
+    const pngDataUrl = canvas.toDataURL('image/png', 0.95);
+    const response = await fetch(pngDataUrl);
+    const pageImageBuffer = await response.arrayBuffer();
 
-    const textItems: { text: string; x: number; y: number; fontSize: number }[] = [];
-    for (const item of textContent.items as any[]) {
-      if (item.str && item.str.trim()) {
-        const tx = item.transform;
-        const x = tx[4];
-        const y = viewport.height - tx[5];
-        const fontSize = Math.abs(tx[0]) || 11;
-        textItems.push({ text: item.str, x, y, fontSize });
-      }
-    }
-
-    // Sort items top-to-bottom, left-to-right
-    textItems.sort((a, b) => {
-      if (Math.abs(a.y - b.y) < 5) return a.x - b.x;
-      return a.y - b.y;
-    });
-
-    // Group items into lines
-    const lines: string[] = [];
-    let currentLine: string[] = [];
-    let lastY = -1;
-
-    for (const item of textItems) {
-      if (lastY === -1 || Math.abs(item.y - lastY) < 8) {
-        currentLine.push(item.text);
-      } else {
-        lines.push(currentLine.join(' '));
-        currentLine = [item.text];
-      }
-      lastY = item.y;
-    }
-    if (currentLine.length > 0) {
-      lines.push(currentLine.join(' '));
-    }
-
-    // Add lines as Word paragraphs
-    for (const lineText of lines) {
-      docParagraphs.push(
-        new Paragraph({
-          children: [
-            new TextRun({
-              text: lineText,
-              font: "Calibri",
-              size: 22 // 11pt
-            })
-          ],
-          spacing: { after: 120 }
-        })
-      );
-    }
+    docParagraphs.push(
+      new Paragraph({
+        children: [
+          new ImageRun({
+            data: pageImageBuffer,
+            transformation: {
+              width: 595.28, // A4 width in points
+              height: 841.89 // A4 height in points
+            }
+          })
+        ]
+      })
+    );
 
     if (pageNum < pdf.numPages) {
       docParagraphs.push(
@@ -175,7 +150,16 @@ async function pdfToWord(arrayBuffer: ArrayBuffer, filename: string): Promise<vo
 
   const doc = new Document({
     sections: [{
-      properties: {},
+      properties: {
+        page: {
+          margin: {
+            top: 0,
+            bottom: 0,
+            left: 0,
+            right: 0
+          }
+        }
+      },
       children: docParagraphs
     }]
   });

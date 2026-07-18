@@ -43,7 +43,9 @@ export default function PdfStudioPage() {
   if (activeTool === 'signer') return <SignerPDF onBack={() => setActiveTool('dashboard')} />;
   if (activeTool === 'organiser') return <OrganiserPDF pdfPages={[]} onPagesUpdate={() => {}} onBack={() => setActiveTool('dashboard')} />;
   if (activeTool === 'numeros') return <NumerosPDF pdfPages={[]} onBack={() => setActiveTool('dashboard')} />;
-  if (activeTool.startsWith('convert-')) return <ConvertPDF type={activeTool} onBack={() => setActiveTool('dashboard')} />;
+  if (activeTool.startsWith('convert-') || ['fusionner', 'diviser', 'compresser', 'pivoter', 'filigrane', 'proteger', 'deverrouiller'].includes(activeTool)) {
+    return <ConvertPDF type={activeTool} onBack={() => setActiveTool('dashboard')} />;
+  }
   
   if (activeTool !== 'dashboard') return <DummyTool title={activeTool} onBack={() => setActiveTool('dashboard')} />;
 

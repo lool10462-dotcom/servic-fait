@@ -40,6 +40,7 @@ export default function ModifierPDF({ onBack }: ModifierPDFProps) {
 
   // Drawing Canvas references
   const canvasRefs = useRef<Record<number, HTMLCanvasElement | null>>({});
+  const initialFileInputRef = useRef<HTMLInputElement>(null);
   const isDrawing = useRef(false);
   const lastPos = useRef({ x: 0, y: 0 });
 
