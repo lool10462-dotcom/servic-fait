@@ -35,6 +35,13 @@ export interface Intervention {
   techSignature?: string; // base64 representation of drawing
   techValidatingDept?: string; // validating department
   preferredService?: string; // preferred service name
+  ficheType?: "intervention" | "attribution";
+  equipRef?: string;
+  techNote?: string;
+  restitutionDetails?: string;
+  dafName?: string;
+  dafSignature?: string;
+  agentSignature?: string;
 }
 
 export interface DevicePhoto {
@@ -50,6 +57,7 @@ export interface TechProfile {
   centerName: string; // e.g., CNIPLC
   savedSignature?: string; // saved signature base64
   validatingDept?: string; // default validating department
+  defaultDafName?: string; // default DAF name
 }
 
 export interface Statistics {

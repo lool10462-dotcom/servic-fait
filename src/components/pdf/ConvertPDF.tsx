@@ -5,6 +5,7 @@ import {
   Columns, Shield, Unlock, Lock, Droplets
 } from 'lucide-react';
 import { PDFDocument, degrees, rgb, StandardFonts } from 'pdf-lib';
+import { Document, Packer, Paragraph, TextRun } from 'docx';
 
 interface ConvertPDFProps {
   type: string;
@@ -95,7 +96,7 @@ async function pdfToJpgImages(arrayBuffer: ArrayBuffer): Promise<{ dataUrl: stri
   return results;
 }
 
-// ── PDF-to-Word using pdfjs-dist (HTML .doc approach) ─────────
+// ── PDF-to-Word using docx (native .docx generation) ─────────
 async function pdfToWord(arrayBuffer: ArrayBuffer, filename: string): Promise<void> {
   const pdfjsLib = await import('pdfjs-dist');
   pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
@@ -104,85 +105,84 @@ async function pdfToWord(arrayBuffer: ArrayBuffer, filename: string): Promise<vo
   ).toString();
 
   const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-  let htmlContent = '';
+  const docParagraphs: Paragraph[] = [];
 
   for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
     const page = await pdf.getPage(pageNum);
     const textContent = await page.getTextContent();
     const viewport = page.getViewport({ scale: 1 });
 
-    // Render page canvas for pixel-perfect background
-    const canvas = document.createElement('canvas');
-    canvas.width = viewport.width;
-    canvas.height = viewport.height;
-    const ctx = canvas.getContext('2d')!;
-    await page.render({ canvasContext: ctx, viewport } as any).promise;
-    const pageImageDataUrl = canvas.toDataURL('image/jpeg', 0.92);
-
-    // Extract text items with positioning
-    const textItems: { text: string; x: number; y: number; fontSize: number; fontName: string }[] = [];
-    
+    const textItems: { text: string; x: number; y: number; fontSize: number }[] = [];
     for (const item of textContent.items as any[]) {
       if (item.str && item.str.trim()) {
         const tx = item.transform;
         const x = tx[4];
-        const y = viewport.height - tx[5]; // flip Y axis
-        const fontSize = Math.abs(tx[0]) || 12;
-        textItems.push({ text: item.str, x, y, fontSize, fontName: item.fontName || 'sans-serif' });
+        const y = viewport.height - tx[5];
+        const fontSize = Math.abs(tx[0]) || 11;
+        textItems.push({ text: item.str, x, y, fontSize });
       }
     }
 
-    // Group text items into lines based on Y proximity
-    const lines: { y: number; items: typeof textItems }[] = [];
+    // Sort items top-to-bottom, left-to-right
+    textItems.sort((a, b) => {
+      if (Math.abs(a.y - b.y) < 5) return a.x - b.x;
+      return a.y - b.y;
+    });
+
+    // Group items into lines
+    const lines: string[] = [];
+    let currentLine: string[] = [];
+    let lastY = -1;
+
     for (const item of textItems) {
-      const existingLine = lines.find(l => Math.abs(l.y - item.y) < item.fontSize * 0.6);
-      if (existingLine) {
-        existingLine.items.push(item);
+      if (lastY === -1 || Math.abs(item.y - lastY) < 8) {
+        currentLine.push(item.text);
       } else {
-        lines.push({ y: item.y, items: [item] });
+        lines.push(currentLine.join(' '));
+        currentLine = [item.text];
       }
+      lastY = item.y;
     }
-    lines.sort((a, b) => a.y - b.y);
+    if (currentLine.length > 0) {
+      lines.push(currentLine.join(' '));
+    }
 
-    const pageHtml = `
-      <div style="position:relative; width:${viewport.width}px; height:${viewport.height}px; page-break-after:always; overflow:hidden; font-family:Arial,sans-serif;">
-        <img src="${pageImageDataUrl}" style="position:absolute;top:0;left:0;width:100%;height:100%;z-index:0;" />
-        <div style="position:absolute;top:0;left:0;width:100%;height:100%;z-index:1;">
-          ${lines.map(line => {
-            const sortedItems = [...line.items].sort((a, b) => a.x - b.x);
-            const lineText = sortedItems.map(it => it.text).join(' ');
-            const first = sortedItems[0];
-            const fontSize = first.fontSize;
-            return `<div style="position:absolute;left:${first.x}px;top:${line.y - fontSize}px;font-size:${fontSize}px;white-space:nowrap;color:transparent;">${lineText}</div>`;
-          }).join('\n')}
-        </div>
-      </div>
-    `;
-
-    htmlContent += pageHtml;
+    // Add lines as Word paragraphs
+    for (const lineText of lines) {
+      docParagraphs.push(
+        new Paragraph({
+          children: [
+            new TextRun({
+              text: lineText,
+              font: "Calibri",
+              size: 22 // 11pt
+            })
+          ],
+          spacing: { after: 120 }
+        })
+      );
+    }
 
     if (pageNum < pdf.numPages) {
-      htmlContent += '\n';
+      docParagraphs.push(
+        new Paragraph({
+          pageBreakBefore: true,
+          children: []
+        })
+      );
     }
   }
 
-  const fullHtml = `<!DOCTYPE html>
-<html>
-<head>
-<meta charset="UTF-8">
-<style>
-  body { margin: 0; padding: 20px; background: #fff; }
-  @media print { body { margin: 0; padding: 0; } }
-</style>
-</head>
-<body>
-${htmlContent}
-</body>
-</html>`;
+  const doc = new Document({
+    sections: [{
+      properties: {},
+      children: docParagraphs
+    }]
+  });
 
-  const blob = new Blob([fullHtml], { type: 'application/msword' });
-  const docName = filename.replace(/\.pdf$/i, '') + '.doc';
-  downloadBlob(blob, docName);
+  const blob = await Packer.toBlob(doc);
+  const docxName = filename.replace(/\.pdf$/i, '') + '.docx';
+  downloadBlob(blob, docxName);
 }
 
 // ── PDF-to-Excel (extract text as CSV) ────────────────────────

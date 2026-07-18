@@ -123,13 +123,13 @@ export async function generateAndDownloadPDF(intervention: Intervention, directo
   doc.setFont("helvetica", "bold");
   doc.setFontSize(15);
   doc.setTextColor(15, 23, 42);
-  doc.text("FICHE D'INTERVENTION TECHNIQUE", 105, currentY, { align: "center" });
+  doc.text(intervention.ficheType === "attribution" ? "FICHE D'ATTRIBUTION ET DE RESTITUTION" : "FICHE D'INTERVENTION TECHNIQUE", 105, currentY, { align: "center" });
   
   currentY += 5;
   doc.setFont("helvetica", "bold");
   doc.setFontSize(8.5);
   doc.setTextColor(197, 160, 67);
-  doc.text("& ATTESTATION DE SERVICE FAIT", 105, currentY, { align: "center" });
+  doc.text(intervention.ficheType === "attribution" ? "& ATTESTATION DE MATÉRIEL ATTRIBUÉ" : "& ATTESTATION DE SERVICE FAIT", 105, currentY, { align: "center" });
 
   if (intervention.preferredService) {
     currentY += 6;
@@ -207,39 +207,49 @@ export async function generateAndDownloadPDF(intervention: Intervention, directo
   doc.setFont("helvetica", "bold");
   doc.setFontSize(7.5);
   doc.setTextColor(115, 84, 24); // Gold-850
-  doc.text("DÉTAILS DE L'ÉQUIPEMENT INFORMATIQUE CONCERNÉ", 19, currentY + 5);
+  doc.text(intervention.ficheType === "attribution" ? "RÉFÉRENCE DE L'ÉQUIPEMENT ATTRIBUÉ" : "DÉTAILS DE L'ÉQUIPEMENT INFORMATIQUE CONCERNÉ", 19, currentY + 5);
   doc.setDrawColor(245, 231, 194);
   doc.line(19, currentY + 6.5, 191, currentY + 6.5);
 
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(8);
-  doc.setTextColor(71, 85, 105);
-  doc.text("Type de matériel :", 19, currentY + 11);
-  doc.setFont("helvetica", "bold");
-  doc.setTextColor(15, 23, 42);
-  doc.text(intervention.deviceType.toUpperCase(), 19, currentY + 15);
+  if (intervention.ficheType === "attribution") {
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
+    doc.setTextColor(71, 85, 105);
+    doc.text("Référence :", 19, currentY + 11);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(10);
+    doc.setTextColor(15, 23, 42);
+    doc.text(intervention.equipRef || "Non spécifiée", 19, currentY + 15);
+  } else {
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
+    doc.setTextColor(71, 85, 105);
+    doc.text("Type de matériel :", 19, currentY + 11);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(15, 23, 42);
+    doc.text(intervention.deviceType.toUpperCase(), 19, currentY + 15);
 
-  doc.setFont("helvetica", "normal");
-  doc.setTextColor(71, 85, 105);
-  doc.text("Modèle / Marque :", 79, currentY + 11);
-  doc.setFont("helvetica", "bold");
-  doc.setTextColor(15, 23, 42);
-  doc.text(intervention.deviceBrand || "Standard/Inconnu", 79, currentY + 15);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(71, 85, 105);
+    doc.text("Modèle / Marque :", 79, currentY + 11);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(15, 23, 42);
+    doc.text(intervention.deviceBrand || "Standard/Inconnu", 79, currentY + 15);
 
-  // Since Asset Tag inventory input is deleted, we either read it from data or display static/N/A
-  doc.setFont("helvetica", "normal");
-  doc.setTextColor(71, 85, 105);
-  doc.text("N° Inventaire (Asset Code) :", 139, currentY + 11);
-  doc.setFont("helvetica", "bold");
-  doc.setTextColor(15, 23, 42);
-  doc.text(intervention.deviceInventory || "N/A", 139, currentY + 15);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(71, 85, 105);
+    doc.text("N° Inventaire (Asset Code) :", 139, currentY + 11);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(15, 23, 42);
+    doc.text(intervention.deviceInventory || "N/A", 139, currentY + 15);
+  }
 
   // 5. RAPPORT SYNTHÉTIQUE
   currentY += 26;
   doc.setFont("helvetica", "bold");
   doc.setFontSize(8.5);
   doc.setTextColor(15, 23, 42);
-  doc.text("RAPPORT SYNTHÉTIQUE D'INTERVENTION", 15, currentY);
+  doc.text(intervention.ficheType === "attribution" ? "DESCRIPTION DE L'ATTRIBUTION" : "RAPPORT SYNTHÉTIQUE D'INTERVENTION", 15, currentY);
   doc.setDrawColor(226, 232, 240);
   doc.setLineWidth(0.2);
   doc.line(15, currentY + 1.5, 195, currentY + 1.5);
@@ -287,9 +297,9 @@ export async function generateAndDownloadPDF(intervention: Intervention, directo
   doc.setFontSize(7.5);
   doc.setTextColor(255, 255, 255);
   doc.text("N°", 18, currentY + 4.8);
-  doc.text("Action de Maintenance Corrective et Préventive", 26, currentY + 4.8);
-  doc.text("Catégorie", 146, currentY + 4.8);
-  doc.text("Statut", 176, currentY + 4.8);
+  doc.text(intervention.ficheType === "attribution" ? "Désignation" : "Action de Maintenance Corrective et Préventive", 26, currentY + 4.8);
+  doc.text(intervention.ficheType === "attribution" ? "Caractéristiques" : "Catégorie", 146, currentY + 4.8);
+  doc.text(intervention.ficheType === "attribution" ? "État" : "Statut", 176, currentY + 4.8);
 
   currentY += 7;
 
@@ -326,7 +336,7 @@ export async function generateAndDownloadPDF(intervention: Intervention, directo
     doc.text(task.category, 144, currentY + 4.5);
     
     doc.setTextColor(16, 185, 129); // Emerald-500
-    doc.text("✓ FAIT", 176, currentY + 4.5);
+    doc.text(intervention.ficheType === "attribution" ? (task.status || "Neuf") : "✓ FAIT", 176, currentY + 4.5);
     
     doc.setFont("helvetica", "normal");
     currentY += rowHeight;
@@ -358,58 +368,130 @@ export async function generateAndDownloadPDF(intervention: Intervention, directo
   doc.setFontSize(7);
   doc.setTextColor(115, 115, 115);
   
-  const declaration = "Déclaration administrative : Ce document atteste de la réalisation effective des travaux de dépannage, d'assistance, d'installation d'équipements ou de maintenance réseau décrits ci-dessus par les services informatiques d'État (CNIPLC). Le bénéficiaire (ou le Directeur de Service) atteste par sa signature que les systèmes informatiques mentionnés sont d'une part réparés, fonctionnels, conformes aux exigences professionnelles et que la prestation a été clôturée avec succès.";
+  const declaration = intervention.ficheType === "attribution"
+    ? "Déclaration administrative : Ce document atteste de l'attribution effective du matériel informatique décrit ci-dessus par les services techniques du CNIPLC au bénéficiaire désigné. Le signataire du DAF, le bénéficiaire et le technicien informatique attestent par leurs signatures respectives que le matériel a été remis en bon état, configuré et opérationnel."
+    : "Déclaration administrative : Ce document atteste de la réalisation effective des travaux de dépannage, d'assistance, d'installation d'équipements ou de maintenance réseau décrits ci-dessus par les services informatiques d'État (CNIPLC). Le bénéficiaire atteste par sa signature que les systèmes informatiques mentionnés sont réparés, fonctionnels et conformes aux exigences professionnelles.";
   const wrappedDecl = doc.splitTextToSize(declaration, 172);
   doc.text(wrappedDecl, 19, currentY + 4.5);
 
-  // 8. DOUBLE SIGNATURES
-  currentY += 24;
-  
-  // Left Block
-  doc.rect(15, currentY, 86, 28);
+  // Restitution & Tech Note blocks (Attribution only)
+  if (intervention.ficheType === "attribution" && intervention.restitutionDetails) {
+    currentY += 22;
+    if (currentY > 240) { doc.addPage(); currentY = 20; }
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(8);
+    doc.setTextColor(180, 83, 9);
+    doc.text("MATÉRIEL RESTITUÉ (ANCIEN ÉQUIPEMENT)", 15, currentY);
+    currentY += 4;
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
+    doc.setTextColor(51, 65, 85);
+    const wrappedRest = doc.splitTextToSize(intervention.restitutionDetails, 180);
+    doc.text(wrappedRest, 15, currentY);
+    currentY += wrappedRest.length * 4 + 2;
+  }
+
+  if (intervention.ficheType === "attribution" && intervention.techNote) {
+    if (currentY > 245) { doc.addPage(); currentY = 20; }
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(8);
+    doc.setTextColor(13, 148, 136);
+    doc.text("NOTE TECHNIQUE", 15, currentY);
+    currentY += 4;
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
+    doc.setTextColor(71, 85, 105);
+    const wrappedNote = doc.splitTextToSize(intervention.techNote, 180);
+    doc.text(wrappedNote, 15, currentY);
+    currentY += wrappedNote.length * 4 + 2;
+  }
+
+  // 8. TRIPLE SIGNATURES
+  currentY += 6;
+  if (currentY > 235) { doc.addPage(); currentY = 20; }
+
+  const sigBoxWidth = 56;
+  const sigBoxHeight = 28;
+  const sigGap = 6;
+  const sigStartX = 15;
+
+  // Box 1: DAF
+  doc.rect(sigStartX, currentY, sigBoxWidth, sigBoxHeight);
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(7.5);
+  doc.setFontSize(6.5);
   doc.setTextColor(15, 23, 42);
-  doc.text("L'INFORMATICIEN INTERVENANT", 18, currentY + 4.5);
+  doc.text("LE DIRECTEUR ADMINISTRATIF", sigStartX + 2, currentY + 4);
+  doc.text("ET FINANCIER", sigStartX + 2, currentY + 7.5);
   doc.setFont("helvetica", "normal");
   doc.setFontSize(7);
   doc.setTextColor(100, 116, 139);
-  doc.text(intervention.techValidatingDept || "CNIPLC Informatique", 18, currentY + 8);
-  
+  doc.text(intervention.dafName || "Le DAF", sigStartX + 2, currentY + 11);
+
+  if (intervention.dafSignature) {
+    try { doc.addImage(intervention.dafSignature, "PNG", sigStartX + 8, currentY + 12, 40, 9); } catch {}
+  }
+
+  doc.line(sigStartX, currentY + 22, sigStartX + sigBoxWidth, currentY + 22);
+  doc.setFontSize(6.5);
+  doc.text("Date : ___ / ___ / ______", sigStartX + 2, currentY + 26);
+
+  // Box 2: Bénéficiaire
+  const sig2X = sigStartX + sigBoxWidth + sigGap;
+  doc.rect(sig2X, currentY, sigBoxWidth, sigBoxHeight);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(6.5);
+  doc.setTextColor(15, 23, 42);
+  doc.text("LE BÉNÉFICIAIRE", sig2X + 2, currentY + 4);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(7);
+  doc.setTextColor(100, 116, 139);
+  doc.text(intervention.clientName, sig2X + 2, currentY + 8);
+  if (intervention.preferredService) {
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(5.5);
+    doc.setTextColor(15, 118, 110);
+    doc.text(intervention.preferredService.toUpperCase(), sig2X + 2, currentY + 11.5);
+  }
+
+  if (intervention.agentSignature) {
+    try { doc.addImage(intervention.agentSignature, "PNG", sig2X + 8, currentY + 12, 40, 9); } catch {}
+  }
+
+  doc.line(sig2X, currentY + 22, sig2X + sigBoxWidth, currentY + 22);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(6.5);
+  doc.setTextColor(100, 116, 139);
+  doc.text("Date : ___ / ___ / ______", sig2X + 2, currentY + 26);
+
+  // Box 3: Technicien IT
+  const sig3X = sig2X + sigBoxWidth + sigGap;
+  doc.rect(sig3X, currentY, sigBoxWidth, sigBoxHeight);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(6.5);
+  doc.setTextColor(15, 23, 42);
+  doc.text("LE TECHNICIEN INFORMATIQUE", sig3X + 2, currentY + 4);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(7);
+  doc.setTextColor(100, 116, 139);
+  doc.text(intervention.techName, sig3X + 2, currentY + 8);
+  doc.setFontSize(6);
+  doc.setTextColor(148, 163, 184);
+  doc.text(intervention.techValidatingDept || "CNIPLC Informatique", sig3X + 2, currentY + 11.5);
+
   if (intervention.techSignature) {
-    try {
-      doc.addImage(intervention.techSignature, "PNG", 30, currentY + 9, 56, 12);
-    } catch (err) {
+    try { doc.addImage(intervention.techSignature, "PNG", sig3X + 8, currentY + 12, 40, 9); } catch (err) {
       console.error("Failed to add tech signature to PDF", err);
     }
   }
 
-  doc.line(15, currentY + 22, 101, currentY + 22);
-  doc.text(`Date : ${intervention.signatureDate ? new Date(intervention.signatureDate).toLocaleDateString('fr-FR') : new Date().toLocaleDateString('fr-FR')}`, 17, currentY + 26);
-  doc.text("Signature", 99, currentY + 26, { align: "right" });
-
-  // Right Block
-  doc.rect(109, currentY, 86, 28);
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(7.5);
-  doc.setTextColor(15, 23, 42);
-  doc.text("LE BÉNÉFICIAIRE / DIRECTEUR", 112, currentY + 4.5);
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(7);
+  doc.line(sig3X, currentY + 22, sig3X + sigBoxWidth, currentY + 22);
+  doc.setFontSize(6.5);
   doc.setTextColor(100, 116, 139);
-  doc.text(intervention.clientName, 112, currentY + 8);
-  if (intervention.preferredService) {
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(6.5);
-    doc.setTextColor(15, 118, 110);
-    doc.text(intervention.preferredService.toUpperCase(), 112, currentY + 11.5);
-  }
-  doc.line(109, currentY + 22, 195, currentY + 22);
-  doc.text("Date : ___ / ___ / ______", 111, currentY + 26);
-  doc.text("Prestation Validée", 193, currentY + 26, { align: "right" });
+  doc.text(`Date : ${intervention.signatureDate ? new Date(intervention.signatureDate).toLocaleDateString('fr-FR') : new Date().toLocaleDateString('fr-FR')}`, sig3X + 2, currentY + 26);
 
   // Clean save action
-  const pdfFileName = `CNIPLC_Intervention_${intervention.refNumber.replace(/\s+/g, "_")}.pdf`;
+  const prefix = intervention.ficheType === "attribution" ? "Attribution" : "Intervention";
+  const pdfFileName = `CNIPLC_${prefix}_${intervention.refNumber.replace(/\s+/g, "_")}.pdf`;
   await savePdfFile(doc, pdfFileName, directoryHandle);
 }
 

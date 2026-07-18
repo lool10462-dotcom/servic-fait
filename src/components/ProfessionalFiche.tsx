@@ -5,8 +5,9 @@
 
 import React, { useState } from "react";
 import { Intervention } from "../types";
-import { Printer, Calendar, User, UserCheck, Shield, Award, Layers, Download, Sparkles, Star, PenTool, X } from "lucide-react";
+import { Printer, Calendar, User, UserCheck, Shield, Award, Layers, Download, Sparkles, Star, PenTool, X, FileText } from "lucide-react";
 import { generateAndDownloadPDF, generateAndDownloadPhotosPDF } from "../utils/pdfGenerator";
+import { generateAndDownloadWord } from "../utils/wordGenerator";
 import PhotoCollage from "./PhotoCollage";
 
 interface ProfessionalFicheProps {
@@ -17,6 +18,7 @@ interface ProfessionalFicheProps {
 
 export default function ProfessionalFiche({ intervention, onPrint, onUpdateSignature }: ProfessionalFicheProps) {
   const [isPdfLoading, setIsPdfLoading] = useState(false);
+  const [isWordLoading, setIsWordLoading] = useState(false);
   const [isSigning, setIsSigning] = useState(false);
   const [validatingDept, setValidatingDept] = useState(intervention.techValidatingDept || "");
   const [isDrawing, setIsDrawing] = useState(false);
@@ -105,13 +107,25 @@ export default function ProfessionalFiche({ intervention, onPrint, onUpdateSigna
     }
   };
 
+  const handleDownloadWord = async () => {
+    setIsWordLoading(true);
+    try {
+      await generateAndDownloadWord(intervention);
+    } catch (err) {
+      console.error("Word generation failed:", err);
+      alert("Une erreur est survenue lors de la génération du fichier Word.");
+    } finally {
+      setIsWordLoading(false);
+    }
+  };
+
   return (
     <div className="bg-white rounded-xl border border-slate-200/80 shadow-sm p-6 max-w-4xl mx-auto my-4 transition-all hover:border-slate-300">
       <div className="flex flex-wrap justify-between items-center pb-4 mb-6 border-b border-slate-100 gap-4 no-print">
         <div>
           <h3 className="text-lg font-semibold text-slate-800 flex items-center gap-2">
             <Layers className="w-5 h-5 text-teal-600" />
-            Aperçu de la Fiche de Service Fait
+            {intervention.ficheType === "attribution" ? "Aperçu de la Fiche d'Attribution" : "Aperçu de la Fiche de Service Fait"}
           </h3>
           <p className="text-xs text-slate-500 mt-0.5">
             Ce document respecte les standards administratifs officiels. Prêt à être imprimé et signé.
@@ -137,6 +151,28 @@ export default function ProfessionalFiche({ intervention, onPrint, onUpdateSigna
               <>
                 <Download className="w-4 h-4 text-teal-600" />
                 Télécharger le PDF
+              </>
+            )}
+          </button>
+          <button
+            id="btn-download-word"
+            disabled={isWordLoading}
+            onClick={handleDownloadWord}
+            className={`text-sm font-semibold px-4 py-2.5 rounded-lg border flex items-center gap-2 cursor-pointer transition-all ${
+              isWordLoading
+                ? "bg-slate-50 text-slate-400 border-slate-200 cursor-not-allowed"
+                : "bg-indigo-50 hover:bg-indigo-100 border-indigo-200/50 text-indigo-800"
+            }`}
+          >
+            {isWordLoading ? (
+              <>
+                <Sparkles className="w-4 h-4 text-indigo-600 animate-spin" />
+                Génération Word...
+              </>
+            ) : (
+              <>
+                <FileText className="w-4 h-4 text-indigo-600" />
+                Télécharger en Word
               </>
             )}
           </button>
@@ -190,10 +226,10 @@ export default function ProfessionalFiche({ intervention, onPrint, onUpdateSigna
         {/* Main Title */}
         <div className="text-center my-6 space-y-2">
           <h1 className="text-2xl font-extrabold uppercase tracking-tight text-slate-900 print:text-xl">
-            FICHE D'INTERVENTION TECHNIQUE
+            {intervention.ficheType === "attribution" ? "FICHE D'ATTRIBUTION ET DE RESTITUTION DE MATÉRIEL" : "FICHE D'INTERVENTION TECHNIQUE"}
           </h1>
           <p className="text-xs text-slate-500 uppercase tracking-widest font-mono">
-            & ATTESTATION DE SERVICE FAIT
+            {intervention.ficheType === "attribution" ? "& ATTESTATION DE MATÉRIEL ATTRIBUÉ" : "& ATTESTATION DE SERVICE FAIT"}
           </p>
         </div>
 
@@ -233,28 +269,35 @@ export default function ProfessionalFiche({ intervention, onPrint, onUpdateSigna
         {/* Détails du Matériel concerné */}
         <div className="border border-slate-200 rounded-lg p-4 my-6 text-sm">
           <div className="text-xs font-bold uppercase tracking-wide text-slate-700 mb-3 border-b border-slate-100 pb-1.5">
-            Détails de l'Équipement Informatique
+            {intervention.ficheType === "attribution" ? "Référence de l'Équipement Attribué" : "Détails de l'Équipement Informatique"}
           </div>
-          <div className="grid grid-cols-3 gap-4 font-mono text-xs">
-            <div>
-              <span className="text-slate-400">Type de matériel :</span><br />
-              <strong className="text-slate-800 uppercase">{intervention.deviceType}</strong>
+          {intervention.ficheType === "attribution" ? (
+            <div className="font-mono text-xs">
+              <span className="text-slate-400">Référence :</span><br />
+              <strong className="text-slate-800 text-sm">{intervention.equipRef || "Non spécifiée"}</strong>
             </div>
-            <div>
-              <span className="text-slate-400">Modèle / Marque :</span><br />
-              <strong className="text-slate-800">{intervention.deviceBrand || "Standard / Indéterminé"}</strong>
+          ) : (
+            <div className="grid grid-cols-3 gap-4 font-mono text-xs">
+              <div>
+                <span className="text-slate-400">Type de matériel :</span><br />
+                <strong className="text-slate-800 uppercase">{intervention.deviceType}</strong>
+              </div>
+              <div>
+                <span className="text-slate-400">Modèle / Marque :</span><br />
+                <strong className="text-slate-800">{intervention.deviceBrand || "Standard / Indéterminé"}</strong>
+              </div>
+              <div>
+                <span className="text-slate-400 font-mono">N° Inventaire (Asset) :</span><br />
+                <strong className="text-slate-800">{intervention.deviceInventory || "N/A"}</strong>
+              </div>
             </div>
-            <div>
-              <span className="text-slate-400 font-mono">N° Inventaire (Asset) :</span><br />
-              <strong className="text-slate-800">{intervention.deviceInventory || "N/A"}</strong>
-            </div>
-          </div>
+          )}
         </div>
 
         {/* Detailed Description / Synthese */}
         <div className="my-6">
           <div className="text-xs font-bold uppercase tracking-wide text-slate-700 mb-2 border-b border-slate-100 pb-1">
-            Rapport Synthétique d'Intervention
+            {intervention.ficheType === "attribution" ? "Description de l'Attribution" : "Rapport Synthétique d'Intervention"}
           </div>
           <p className="text-sm text-slate-800 whitespace-pre-wrap leading-relaxed text-justify bg-slate-50/50 p-3.5 rounded border border-slate-100/60 print:bg-transparent print:border-0 print:p-0">
             {intervention.professionalSummary || "Aucune description rédigée."}
@@ -276,15 +319,15 @@ export default function ProfessionalFiche({ intervention, onPrint, onUpdateSigna
         {/* Itemized Tasks accomplished */}
         <div className="my-6">
           <div className="text-xs font-bold uppercase tracking-wide text-slate-700 mb-2.5 border-b border-slate-100 pb-1">
-            Nomenclature des Actions Techniques Réalisées
+            {intervention.ficheType === "attribution" ? "Désignation du Matériel Attribué" : "Nomenclature des Actions Techniques Réalisées"}
           </div>
           <table className="w-full text-xs text-left border-collapse border border-slate-200">
             <thead>
               <tr className="bg-slate-100 text-slate-700 font-bold border-b border-slate-200 uppercase tracking-wider">
                 <th className="p-2 border-r border-slate-200">N°</th>
-                <th className="p-2 border-r border-slate-200">Action de Maintenance Corrective / Préventive</th>
-                <th className="p-2 border-r border-slate-200">Catégorie</th>
-                <th className="p-2 text-center">Statut</th>
+                <th className="p-2 border-r border-slate-200">{intervention.ficheType === "attribution" ? "Désignation" : "Action de Maintenance Corrective / Préventive"}</th>
+                <th className="p-2 border-r border-slate-200">{intervention.ficheType === "attribution" ? "Caractéristiques Techniques" : "Catégorie"}</th>
+                <th className="p-2 text-center">{intervention.ficheType === "attribution" ? "État" : "Statut"}</th>
               </tr>
             </thead>
             <tbody>
@@ -298,20 +341,44 @@ export default function ProfessionalFiche({ intervention, onPrint, onUpdateSigna
                     </span>
                   </td>
                   <td className="p-2 text-center font-bold text-emerald-700 font-sans">
-                    ✓ EFFECTUÉ
+                    {intervention.ficheType === "attribution" ? task.status || "Neuf" : "✓ EFFECTUÉ"}
                   </td>
                 </tr>
               ))}
               {intervention.tasks.length === 0 && (
                 <tr>
                   <td colSpan={4} className="p-4 text-center text-slate-400 font-mono">
-                    Aucune action technique enregistrée.
+                    {intervention.ficheType === "attribution" ? "Aucun matériel enregistré." : "Aucune action technique enregistrée."}
                   </td>
                 </tr>
               )}
             </tbody>
           </table>
         </div>
+
+        {/* Restitution Details (Attribution only) */}
+        {intervention.ficheType === "attribution" && intervention.restitutionDetails && (
+          <div className="my-6 border border-amber-200 bg-amber-50/30 rounded-lg p-4 print:bg-transparent print:border-slate-300">
+            <div className="text-xs font-bold uppercase tracking-wide text-amber-800 print:text-slate-800 mb-2 border-b border-amber-200 print:border-slate-200 pb-1">
+              Matériel Restitué (Ancien Équipement)
+            </div>
+            <p className="text-xs text-slate-700 whitespace-pre-wrap leading-normal">
+              {intervention.restitutionDetails}
+            </p>
+          </div>
+        )}
+
+        {/* Tech Note (Attribution only) */}
+        {intervention.ficheType === "attribution" && intervention.techNote && (
+          <div className="my-6 border border-teal-100 bg-teal-50/25 rounded-lg p-3.5 print:bg-transparent print:border-slate-300">
+            <div className="text-xs font-bold uppercase tracking-wide text-teal-800 print:text-slate-800 mb-2 border-b border-teal-100 print:border-slate-200 pb-1">
+              Note Technique
+            </div>
+            <p className="text-xs text-slate-600 print:text-slate-700 whitespace-pre-wrap leading-normal">
+              {intervention.techNote}
+            </p>
+          </div>
+        )}
 
         {/* Dynamic Photo board Collage */}
         {intervention.photos && intervention.photos.length > 0 && (
@@ -323,60 +390,81 @@ export default function ProfessionalFiche({ intervention, onPrint, onUpdateSigna
         {/* Commitment and legal declaration */}
         <div className="my-6 bg-slate-50/80 p-3 rounded-lg border border-slate-200/60 text-[11px] text-slate-500 text-justify print:bg-transparent print:border print:border-slate-300 print:text-[10px]/normal">
           <p className="leading-normal">
-            <strong>Déclaration administrative :</strong> Ce document atteste de la réalisation effective des travaux de dépannage, d'assistance, d'installation d'équipements ou de maintenance réseau décrits ci-dessus par les services informatiques d'État (CNIPLC). Le bénéficiaire (or le Directeur de Service) atteste par sa signature que les systèmes informatiques mentionnés sont d'une part réparés, fonctionnels, conformes aux exigences professionnelles et que la prestation a été clôturée avec succès.
+            <strong>Déclaration administrative :</strong> {intervention.ficheType === "attribution"
+              ? "Ce document atteste de l'attribution effective du matériel informatique décrit ci-dessus par les services techniques du CNIPLC au bénéficiaire désigné. Le signataire du DAF, le bénéficiaire et le technicien informatique attestent par leurs signatures respectives que le matériel a été remis en bon état, configuré et opérationnel."
+              : "Ce document atteste de la réalisation effective des travaux de dépannage, d'assistance, d'installation d'équipements ou de maintenance réseau décrits ci-dessus par les services informatiques d'État (CNIPLC). Le bénéficiaire (ou le Directeur de Service) atteste par sa signature que les systèmes informatiques mentionnés sont réparés, fonctionnels, conformes aux exigences professionnelles et que la prestation a été clôturée avec succès."}
           </p>
         </div>
 
-        {/* Double-Signature Block */}
-        <div className="grid grid-cols-2 gap-10 mt-10 text-xs">
-          {/* Signature Technicien */}
-          <div className="h-40 border border-slate-300 rounded p-3 flex flex-col justify-between print:bg-transparent relative">
+        {/* Triple-Signature Block */}
+        <div className="grid grid-cols-3 gap-4 mt-10 text-xs">
+          {/* Signature du DAF */}
+          <div className="h-36 border border-slate-300 rounded p-2.5 flex flex-col justify-between print:bg-transparent">
             <div>
-              <div className="font-bold uppercase text-slate-800 tracking-wider">L'Informaticien Intervenant</div>
-              <div className="text-slate-500 font-medium text-[10px] mt-0.5">{intervention.techValidatingDept || "CNIPLC Informatique"}</div>
+              <div className="font-bold uppercase text-slate-800 tracking-wider text-[10px] leading-tight">Le Directeur Administratif et Financier</div>
+              <div className="text-slate-500 font-medium text-[9px] mt-0.5">{intervention.dafName || "Le DAF"}</div>
             </div>
-            
             <div className="flex-1 flex items-center justify-center my-1">
-              {intervention.techSignature ? (
-                <img 
-                  src={intervention.techSignature} 
-                  alt="Signature Intervenant" 
-                  className="max-h-20 object-contain drop-shadow-sm"
-                />
+              {intervention.dafSignature ? (
+                <img src={intervention.dafSignature} alt="Signature DAF" className="max-h-14 object-contain drop-shadow-sm" />
               ) : (
-                <button
-                  type="button"
-                  onClick={() => setIsSigning(true)}
-                  className="no-print bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 text-[10px] font-bold px-3 py-1.5 rounded-lg transition-colors cursor-pointer flex items-center gap-1"
-                >
-                  <PenTool className="w-3.5 h-3.5" />
-                  Signer la fiche
-                </button>
+                <div className="text-[9px] text-slate-300 italic">Signature</div>
               )}
             </div>
-
-            <div className="border-t border-slate-200 pt-1.5 text-slate-500 text-[10px] flex justify-between">
-              <span>Date : {intervention.signatureDate ? new Date(intervention.signatureDate).toLocaleDateString('fr-FR') : new Date().toLocaleDateString('fr-FR')}</span>
+            <div className="border-t border-slate-200 pt-1 text-slate-500 text-[9px] flex justify-between">
+              <span>Date : ___ / ___ / ______</span>
               <span className="italic">Signature</span>
             </div>
           </div>
 
-          {/* Signature Directeur ou Bénéficiaire */}
-          <div className="h-40 border border-slate-300 rounded p-3 flex flex-col justify-between print:bg-transparent">
+          {/* Signature de l'Agent / Bénéficiaire */}
+          <div className="h-36 border border-slate-300 rounded p-2.5 flex flex-col justify-between print:bg-transparent">
             <div>
-              <div className="font-bold uppercase text-slate-800 tracking-wider">Le Bénéficiaire / Directeur</div>
-              <div className="text-slate-500 font-medium text-[10px] mt-0.5">{intervention.clientName}</div>
+              <div className="font-bold uppercase text-slate-800 tracking-wider text-[10px] leading-tight">Le Bénéficiaire</div>
+              <div className="text-slate-500 font-medium text-[9px] mt-0.5">{intervention.clientName}</div>
               {intervention.preferredService && (
-                <div className="text-teal-700 font-bold text-[9px] mt-0.5 uppercase tracking-wide">
+                <div className="text-teal-700 font-bold text-[8px] mt-0.5 uppercase tracking-wide">
                   {intervention.preferredService}
                 </div>
               )}
             </div>
-            <div className="border-t border-slate-200 pt-1.5 text-slate-500 text-[10px] flex justify-between">
+            <div className="flex-1 flex items-center justify-center my-1">
+              {intervention.agentSignature ? (
+                <img src={intervention.agentSignature} alt="Signature Agent" className="max-h-14 object-contain drop-shadow-sm" />
+              ) : (
+                <div className="text-[9px] text-slate-300 italic">Signature</div>
+              )}
+            </div>
+            <div className="border-t border-slate-200 pt-1 text-slate-500 text-[9px] flex justify-between">
               <span>Date : ___ / ___ / ______</span>
-              <span className="italic font-bold text-slate-700">
-                Service Fait {intervention.preferredService ? "(Signature)" : "(Signature)"}
-              </span>
+              <span className="italic">Service Fait</span>
+            </div>
+          </div>
+
+          {/* Signature du Technicien IT */}
+          <div className="h-36 border border-slate-300 rounded p-2.5 flex flex-col justify-between print:bg-transparent relative">
+            <div>
+              <div className="font-bold uppercase text-slate-800 tracking-wider text-[10px] leading-tight">Le Technicien Informatique</div>
+              <div className="text-slate-500 font-medium text-[9px] mt-0.5">{intervention.techName}</div>
+              <div className="text-slate-400 text-[8px]">{intervention.techValidatingDept || "CNIPLC Informatique"}</div>
+            </div>
+            <div className="flex-1 flex items-center justify-center my-1">
+              {intervention.techSignature ? (
+                <img src={intervention.techSignature} alt="Signature Technicien" className="max-h-14 object-contain drop-shadow-sm" />
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setIsSigning(true)}
+                  className="no-print bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 text-[9px] font-bold px-2 py-1 rounded-lg transition-colors cursor-pointer flex items-center gap-1"
+                >
+                  <PenTool className="w-3 h-3" />
+                  Signer
+                </button>
+              )}
+            </div>
+            <div className="border-t border-slate-200 pt-1 text-slate-500 text-[9px] flex justify-between">
+              <span>Date : {intervention.signatureDate ? new Date(intervention.signatureDate).toLocaleDateString('fr-FR') : new Date().toLocaleDateString('fr-FR')}</span>
+              <span className="italic">Signature</span>
             </div>
           </div>
         </div>

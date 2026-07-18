@@ -27,6 +27,7 @@ import {
   writeJsonToDirectory 
 } from "./utils/localDiskStorage";
 import { generateAndDownloadPDF, generateAndDownloadPhotosPDF } from "./utils/pdfGenerator";
+import { generateAndDownloadWord } from "./utils/wordGenerator";
 import { 
   supabase, 
   getSession, 
@@ -330,7 +331,7 @@ export default function App({ embedded = false }: AppProps) {
       showToastNotification("Erreur lors de la sauvegarde Supabase.");
     }
 
-    // Immediately compile and trigger PDF download/save
+    // Immediately compile and trigger PDF/Word download/save
     try {
       await generateAndDownloadPDF(fullIntervention, localDirHandle);
       if (fullIntervention.photos && fullIntervention.photos.length > 0) {
@@ -338,6 +339,12 @@ export default function App({ embedded = false }: AppProps) {
       }
     } catch (e) {
       console.error("Auto PDF generation failed:", e);
+    }
+
+    try {
+      await generateAndDownloadWord(fullIntervention);
+    } catch (e) {
+      console.error("Auto Word generation failed:", e);
     }
 
     // For single saves, navigate immediately. For batch saves, navigation is handled above.

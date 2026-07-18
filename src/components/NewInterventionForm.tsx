@@ -6,7 +6,7 @@
 import React, { useState } from "react";
 import { Intervention, TechProfile, TaskItem, DevicePhoto } from "../types";
 import { DEPARTMENTS, DEVICE_TYPES, TASK_CATEGORIES } from "../data/constants";
-import { Sparkles, Plus, Trash2, Save, AlertTriangle, UploadCloud, Camera, X, Mic, MicOff, Star } from "lucide-react";
+import { Sparkles, Plus, Trash2, Save, AlertTriangle, UploadCloud, Camera, X, Mic, MicOff, Star, FileText, Package } from "lucide-react";
 import { GoogleGenAI, Type } from "@google/genai";
 import PhotoCollage from "./PhotoCollage";
 import { Employee, fetchEmployees } from "../lib/supabase";
@@ -35,6 +35,19 @@ export default function NewInterventionForm({
   const [clientDepartment, setClientDepartment] = useState(DEPARTMENTS[0]);
   const [quickNotes, setQuickNotes] = useState("");
   
+  // Fiche d'Attribution states
+  const [ficheType, setFicheType] = useState<"intervention" | "attribution">("intervention");
+  const [equipRef, setEquipRef] = useState("");
+  const [techNote, setTechNote] = useState("");
+  const [restitutionDetails, setRestitutionDetails] = useState("");
+  const [dafName, setDafName] = useState("Mr. YACIN SAID");
+
+  React.useEffect(() => {
+    if (techProfile?.defaultDafName) {
+      setDafName(techProfile.defaultDafName);
+    }
+  }, [techProfile]);
+
   // Multi-beneficiary batch logging states
   const [isMultiBeneficiary, setIsMultiBeneficiary] = useState(false);
   const [beneficiaries, setBeneficiaries] = useState<{ name: string; title: string; department: string }[]>([]);
@@ -396,6 +409,7 @@ export default function NewInterventionForm({
     ]);
     setClientName("");
     setClientTitle("");
+    setClientDepartment("");
   };
 
   const handleEditBeneficiary = (idx: number) => {
@@ -422,6 +436,7 @@ export default function NewInterventionForm({
     setEditingBeneficiaryIdx(null);
     setClientName("");
     setClientTitle("");
+    setClientDepartment("");
   };
 
   const handleRemoveBeneficiaryFromList = (index: number) => {
@@ -429,6 +444,7 @@ export default function NewInterventionForm({
       setEditingBeneficiaryIdx(null);
       setClientName("");
       setClientTitle("");
+      setClientDepartment("");
     }
     setBeneficiaries(beneficiaries.filter((_, i) => i !== index));
   };
@@ -439,11 +455,12 @@ export default function NewInterventionForm({
     setEditingBeneficiaryIdx(null);
     setClientName("");
     setClientTitle("");
+    setClientDepartment("");
   };
 
   const handleRefineWithIA = async () => {
     if (!rawNotes.trim()) {
-      setAiError("Veuillez d'abord saisir vos notes d'intervention rapides/brutes ci-dessous.");
+      setAiError(ficheType === "attribution" ? "Veuillez d'abord saisir vos notes d'attribution/restitution brutes ci-dessous." : "Veuillez d'abord saisir vos notes d'intervention rapides/brutes ci-dessous.");
       return;
     }
     setAiError("");
@@ -465,7 +482,9 @@ export default function NewInterventionForm({
             deviceBrand,
             clientName,
             clientTitle,
-            clientDepartment
+            clientDepartment,
+            ficheType,
+            equipRef
           })
         });
 
@@ -495,18 +514,28 @@ export default function NewInterventionForm({
                 messages: [
                   {
                     role: "system",
-                    content: 
-                      "Vous êtes un assistant IA de rédaction administrative d'État d'élite rattaché au CNIPLC (Centre National d'Informatique) de la République de Djibouti. " +
-                      "Votre rôle est d'aider les techniciens à reformuler leurs notes rapides en rapports d'intervention haut de gamme, rédigés dans un français officiel, clair, soutenu et rigoureux. " +
-                      "Vous devez impérativement intégrer de façon naturelle l'ensemble des données du formulaire : l'appareil résolu, sa marque, le nom complet du bénéficiaire, son titre/fonction et son département ministériel d'affectation pour produire un texte sur-mesure. " +
-                      "Vous devez obligatoirement renvoyer vos réponses au format JSON strict avec les clés de premier niveau suivantes :\n" +
-                      "1. 'professionalSummary': un compte rendu global, rédigé, fluide et respectueux décrivant l'ensemble de la prestation de service fait en français administratif, mentionnant le bénéficiaire, son titre, son département, et l'atteinte de la réparation.\n" +
-                      "2. 'tasks': une liste d'actes techniques précis (array d'objets) contenant chacun 'description' (le libellé de l'acte technique précis rédigé de façon professionnelle et détaillée, ex: 'Maintenance physique curative par démontage, dépoussiérage et remplacement de barrette mémoire active') " +
-                      "et 'category' (obligatoirement l'un des choix suivants: 'Matériel', 'Logiciel', 'Réseau', 'Sécurité', 'Optimisation', 'Autre')."
+                    content: ficheType === "attribution"
+                      ? "Vous êtes un expert IA des rédactions techniques et administratives de haut niveau pour l'État, rattaché au CNIPLC (Centre National d'Informatique) de la République de Djibouti. " +
+                        "Votre mission est d'aider les techniciens à formuler leurs notes rapides d'attribution et de restitution de matériel en documents officiels propres, rédigés en français officiel, élégant et précis. " +
+                        "Vous devez obligatoirement renvoyer vos réponses au format JSON strict avec les clés de premier niveau suivantes :\n" +
+                        "1. 'equipRef': la référence de l'équipement (ex: 'Don N° 2100155041968').\n" +
+                        "2. 'professionalSummary': une synthèse rédigée polie et hautement professionnelle décrivant l'attribution.\n" +
+                        "3. 'restitutionDetails': les détails des anciens équipements restitués s'il y a lieu.\n" +
+                        "4. 'techNote': une note technique sur les configurations spéciales réalisées.\n" +
+                        "5. 'tasks': un tableau d'objets (matériels attribués) contenant chacun 'description' (Désignation, ex: 'Unité centrale'), 'category' (Caractéristiques, ex: 'Intel core i5(11generation)'), 'status' (État, ex: 'Neuf')."
+                      : "Vous êtes un assistant IA de rédaction administrative d'État d'élite rattaché au CNIPLC (Centre National d'Informatique) de la République de Djibouti. " +
+                        "Votre rôle est d'aider les techniciens à reformuler leurs notes rapides en rapports d'intervention haut de gamme, rédigés dans un français officiel, clair, soutenu et rigoureux. " +
+                        "Vous devez impérativement intégrer de façon naturelle l'ensemble des données du formulaire : l'appareil résolu, sa marque, le nom complet du bénéficiaire, son titre/fonction et son département ministériel d'affectation pour produire un texte sur-mesure. " +
+                        "Vous devez obligatoirement renvoyer vos réponses au format JSON strict avec les clés de premier niveau suivantes :\n" +
+                        "1. 'professionalSummary': un compte rendu global, rédigé, fluide et respectueux décrivant l'ensemble de la prestation de service fait en français administratif, mentionnant le bénéficiaire, son titre, son département, et l'atteinte de la réparation.\n" +
+                        "2. 'tasks': une liste d'actes techniques précis (array d'objets) contenant chacun 'description' (le libellé de l'acte technique précis rédigé de façon professionnelle et détaillée, ex: 'Maintenance physique curative par démontage, dépoussiérage et remplacement de barrette mémoire active') " +
+                        "et 'category' (obligatoirement l'un des choix suivants: 'Matériel', 'Logiciel', 'Réseau', 'Sécurité', 'Optimisation', 'Autre')."
                   },
                   {
                     role: "user",
-                    content: `Équipement: ${deviceType || 'Ordinateur'} (${deviceBrand || 'Standard'})\nBénéficiaire d'État: ${clientName || 'Collaborateur'} - ${clientTitle || 'Fonctionnaire'} au sein du service : ${clientDepartment || 'Dossier Technique'}\nNotes brutes et rapides du technicien à formuler : "${rawNotes}"`
+                    content: ficheType === "attribution"
+                      ? `Bénéficiaire d'État: ${clientName || 'Collaborateur'} - ${clientTitle || 'Fonctionnaire'} au sein du service : ${clientDepartment || 'Dossier Technique'}\nNotes brutes et rapides du technicien d'attribution à formuler : "${rawNotes}"`
+                      : `Équipement: ${deviceType || 'Ordinateur'} (${deviceBrand || 'Standard'})\nBénéficiaire d'État: ${clientName || 'Collaborateur'} - ${clientTitle || 'Fonctionnaire'} au sein du service : ${clientDepartment || 'Dossier Technique'}\nNotes brutes et rapides du technicien à formuler : "${rawNotes}"`
                   }
                 ],
                 temperature: 0.2,
@@ -534,49 +563,82 @@ export default function NewInterventionForm({
           } else {
             console.log("[Client Gemini] Exécution directe côté navigateur via le SDK GoogleGenAI...");
             const aiClient = new GoogleGenAI({ apiKey: clientApiKey });
-            const prompt = `Notes brutes du technicien: "${rawNotes}"\nÉquipement concerné: ${deviceType || 'PC'} (Marque: ${deviceBrand || 'Standard'})\nBénéficiaire: ${clientName || 'Collaborateur'} (${clientTitle || 'Fonctionnaire'})\nSecteur/Département: ${clientDepartment || 'Dossier Technique'}\n\nFormulez ceci de manière extrêmement professionnelle en insérant intelligemment et formellement ces informations dans un style d'attestation administrative officielle d'État de style République de Djibouti.`;
+            const prompt = ficheType === "attribution"
+              ? `Bénéficiaire d'État: ${clientName || 'Collaborateur'} - ${clientTitle || 'Fonctionnaire'} au sein du service : ${clientDepartment || 'Dossier Technique'}\nNotes brutes d'attribution: "${rawNotes}"\n\nFormulez ceci de manière extrêmement professionnelle en extrayant la désignation du matériel attribué, ses caractéristiques et son état, ainsi que l'ancien matériel restitué et la note technique.`
+              : `Notes brutes du technicien: "${rawNotes}"\nÉquipement concerné: ${deviceType || 'PC'} (Marque: ${deviceBrand || 'Standard'})\nBénéficiaire: ${clientName || 'Collaborateur'} (${clientTitle || 'Fonctionnaire'})\nSecteur/Département: ${clientDepartment || 'Dossier Technique'}\n\nFormulez ceci de manière extrêmement professionnelle en insérant intelligemment et formellement ces informations dans un style d'attestation administrative officielle d'État de style République de Djibouti.`;
 
             const aiResponse = await aiClient.models.generateContent({
               model: "gemini-3.5-flash",
               contents: prompt,
               config: {
-                systemInstruction: 
-                  "Vous êtes un expert IA des rédactions techniques et administratives de haut niveau pour l'État, rattaché au CNIPLC (Centre National d'Informatique) de la République de Djibouti. " +
-                  "Votre mission est d'aider les techniciens à transformer leurs notes d'intervention rapides (ex: 'depan pc ram qui rame') en rapports techniques d'intervention " +
-                  "hautement professionnels, rédigés en français officiel, élégant, soutenu et précis. " +
-                  "Intégrez intelligemment le bénéficiaire, sa fonction officielle, son direction/département, ainsi que le matériel et sa marque dans un compte rendu global parfait. " +
-                  "Séparez l'intervention en une synthèse globale formelle personnalisée ('professionalSummary') " +
-                  "et une série d'actions techniques atomiques ('tasks') catégorisées.",
+                systemInstruction: ficheType === "attribution"
+                  ? "Vous êtes un expert IA des rédactions techniques et administratives de haut niveau pour l'État, rattaché au CNIPLC (Centre National d'Informatique) de la République de Djibouti. " +
+                    "Votre mission est d'aider les techniciens à formuler leurs notes rapides d'attribution et de restitution de matériel en documents officiels propres, rédigés en français officiel, élégant et précis. " +
+                    "Vous devez renvoyer vos réponses au format JSON strict avec les clés de premier niveau suivantes :\n" +
+                    "1. 'equipRef': la référence de l'équipement (ex: 'Don N° 2100155041968').\n" +
+                    "2. 'professionalSummary': une synthèse rédigée polie et hautement professionnelle décrivant l'attribution.\n" +
+                    "3. 'restitutionDetails': les détails des anciens équipements restitués s'il y a lieu.\n" +
+                    "4. 'techNote': une note technique sur les configurations spéciales réalisées.\n" +
+                    "5. 'tasks': un tableau d'objets (matériels attribués) contenant chacun 'description' (Désignation, ex: 'Unité centrale'), 'category' (Caractéristiques, ex: 'Intel core i5(11generation)'), 'status' (État, ex: 'Neuf')."
+                  : "Vous êtes un expert IA des rédactions techniques et administratives de haut niveau pour l'État, rattaché au CNIPLC (Centre National d'Informatique) de la République de Djibouti. " +
+                    "Votre mission est d'aider les techniciens à transformer leurs notes d'intervention rapides (ex: 'depan pc ram qui rame') en rapports techniques d'intervention " +
+                    "hautement professionnels, rédigés en français officiel, élégant, soutenu et précis. " +
+                    "Intégrez intelligemment le bénéficiaire, sa fonction officielle, son direction/département, ainsi que le matériel et sa marque dans un compte rendu global parfait. " +
+                    "Séparez l'intervention en une synthèse globale formelle personnalisée ('professionalSummary') " +
+                    "et une série d'actions techniques atomiques ('tasks') catégorisées.",
                 responseMimeType: "application/json",
-                responseSchema: {
-                  type: Type.OBJECT,
-                  properties: {
-                    professionalSummary: {
-                      type: Type.STRING,
-                      description: "Une synthèse rédigée polie et hautement professionnelle décrivant l'ensemble de l'opération en français de style officiel en intégrant le bénéficiaire, sa fonction, son département, le matériel résolu et la résolution positive de la panne."
-                    },
-                    tasks: {
-                      type: Type.ARRAY,
-                      description: "La décomposition des actions de maintenance et d'assistance concrètes réalisées.",
-                      items: {
-                        type: Type.OBJECT,
-                        properties: {
-                          description: {
-                            type: Type.STRING,
-                            description: "Une phrase courte et claire décrivant l'action précise réalisée (ex: 'Démontage interne, dépollution mécanique des composants et mise à niveau de la RAM DDR4 8Go')."
-                          },
-                          category: {
-                            type: Type.STRING,
-                            enum: ["Matériel", "Logiciel", "Réseau", "Sécurité", "Optimisation", "Autre"],
-                            description: "La classification de l'action technique."
+                responseSchema: ficheType === "attribution"
+                  ? {
+                      type: Type.OBJECT,
+                      properties: {
+                        equipRef: { type: Type.STRING },
+                        professionalSummary: { type: Type.STRING },
+                        restitutionDetails: { type: Type.STRING },
+                        techNote: { type: Type.STRING },
+                        tasks: {
+                          type: Type.ARRAY,
+                          items: {
+                            type: Type.OBJECT,
+                            properties: {
+                              description: { type: Type.STRING },
+                              category: { type: Type.STRING },
+                              status: { type: Type.STRING }
+                            },
+                            required: ["description", "category", "status"]
                           }
-                        },
-                        required: ["description", "category"]
-                      }
+                        }
+                      },
+                      required: ["equipRef", "professionalSummary", "tasks"]
                     }
-                  },
-                  required: ["professionalSummary", "tasks"]
-                }
+                  : {
+                      type: Type.OBJECT,
+                      properties: {
+                        professionalSummary: {
+                          type: Type.STRING,
+                          description: "Une synthèse rédigée polie et hautement professionnelle décrivant l'ensemble de l'opération en français de style officiel en intégrant le bénéficiaire, sa fonction, son département, le matériel résolu et la résolution positive de la panne."
+                        },
+                        tasks: {
+                          type: Type.ARRAY,
+                          description: "La décomposition des actions de maintenance et d'assistance concrètes réalisées.",
+                          items: {
+                            type: Type.OBJECT,
+                            properties: {
+                              description: {
+                                type: Type.STRING,
+                                description: "Une phrase courte et claire décrivant l'action précise réalisée (ex: 'Démontage interne, dépollution mécanique des composants et mise à niveau de la RAM DDR4 8Go')."
+                              },
+                              category: {
+                                type: Type.STRING,
+                                enum: ["Matériel", "Logiciel", "Réseau", "Sécurité", "Optimisation", "Autre"],
+                                description: "La classification de l'action technique."
+                              }
+                            },
+                            required: ["description", "category"]
+                          }
+                        }
+                      },
+                      required: ["professionalSummary", "tasks"]
+                    }
               }
             });
 
@@ -587,35 +649,49 @@ export default function NewInterventionForm({
             }
           }
         } else {
-          // Both server is unavailable AND VITE_GEMINI_API_KEY is not defined in Vercel.
           throw new Error("Vercel_No_API_Key");
         }
       }
-      
-      if (data && data.professionalSummary) {
-        setProfessionalSummary(data.professionalSummary);
-      }
-      
-      if (data && data.tasks && Array.isArray(data.tasks)) {
-        setTasks(data.tasks.map((t: any) => ({
-          description: t.description,
-          category: t.category,
-          status: "completed"
-        })));
+
+      if (data) {
+        if (data.clientName) setClientName(data.clientName);
+        if (data.clientTitle) setClientTitle(data.clientTitle);
+        if (data.clientDepartment) setClientDepartment(data.clientDepartment);
+        if (data.deviceType && ficheType !== "attribution") setDeviceType(data.deviceType);
+        if (data.deviceBrand && ficheType !== "attribution") setDeviceBrand(data.deviceBrand);
+        if (data.date) setDate(data.date);
+        if (data.rawNotes) setRawNotes(data.rawNotes);
+        if (data.professionalSummary) setProfessionalSummary(data.professionalSummary);
+        if (data.equipRef) setEquipRef(data.equipRef);
+        if (data.restitutionDetails) setRestitutionDetails(data.restitutionDetails);
+        if (data.techNote) setTechNote(data.techNote);
+        if (data.tasks && Array.isArray(data.tasks)) {
+          setTasks(data.tasks.map((t: any) => ({
+            description: t.description,
+            category: t.category,
+            status: t.status || "completed"
+          })));
+        }
       }
     } catch (err: any) {
       console.error(err);
       if (err.message === "Vercel_No_API_Key") {
-        setAiError("Déploiement Vercel : Le serveur d'API Express local de l'application (qui gère l'orchestration NVIDIA Llama et Gemini) n'est pas actif dans votre navigateur (normal en hébergement statique SPA sur Vercel). Pour activer la reformulation intelligente directe d'intervention, ajoutez simplement le paramètre d'environnement VITE_GEMINI_API_KEY avec votre clé d'API NVIDIA (commençant par 'nvapi-') ou votre clé d'API Google Gemini dans les paramètres de votre projet sur le tableau de bord Vercel !");
+        setAiError("Déploiement Vercel : Le serveur d'API Express local de l'application n'est pas actif dans votre navigateur. Pour activer la reformulation intelligente, ajoutez simplement la variable d'environnement VITE_GEMINI_API_KEY.");
       } else {
         setAiError("Le service IA du CNIPLC n'a pas pu traiter ce texte. Une reformulation générique a été appliquée.");
       }
-      
-      // Local fallback
-      setProfessionalSummary(`Intervention technique sur l'appareil ${deviceBrand || ''} ${deviceType}. Travaux effectués conformément aux notes du technicien : ${rawNotes}.`);
-      setTasks([
-        { description: `Diagnostic et maintenance : ${rawNotes}`, category: "Autre", status: "completed" }
-      ]);
+
+      if (ficheType === "attribution") {
+        setProfessionalSummary(`Attribution formelle de matériel informatique au profit de ${clientName || "l'agent d'État"} (${clientTitle || 'Fonctionnaire'}), affecté(e) au département ${clientDepartment || 'Technique'}.`);
+        setTasks([
+          { description: "Matériel informatique", category: "Standard", status: "Neuf" }
+        ]);
+      } else {
+        setProfessionalSummary(`Intervention technique sur l'appareil ${deviceBrand || ''} ${deviceType}. Travaux effectués conformément aux notes du technicien : ${rawNotes}.`);
+        setTasks([
+          { description: `Diagnostic et maintenance : ${rawNotes}`, category: "Autre", status: "completed" }
+        ]);
+      }
     } finally {
       setIsAiLoading(false);
     }
@@ -697,9 +773,9 @@ export default function NewInterventionForm({
     }
 
     // Default professional summary if empty
-    const actualSummary = professionalSummary.trim() || `Intervention de maintenance corrective. ${rawNotes}`;
+    const actualSummary = professionalSummary.trim() || (ficheType === "attribution" ? `Attribution de matériel informatique. ${rawNotes}` : `Intervention de maintenance corrective. ${rawNotes}`);
     const actualTasksParams = tasks.length > 0 ? tasks : [
-      { description: rawNotes || "Prestation d'assistance informatique standard", category: "Autre" as const, status: "completed" as const }
+      { description: rawNotes || (ficheType === "attribution" ? "Matériel informatique attribué" : "Prestation d'assistance informatique standard"), category: (ficheType === "attribution" ? "Standard" : "Autre") as any, status: (ficheType === "attribution" ? "Neuf" : "completed") as any }
     ];
 
     // Save for each beneficiary
@@ -713,7 +789,7 @@ export default function NewInterventionForm({
         clientDepartment: ben.department,
         techName: techProfile?.name || "Technicien Informatique",
         techTitle: techProfile?.title || "Support CNIPLC",
-        deviceType,
+        deviceType: ficheType === "attribution" ? "Matériel" : deviceType,
         deviceBrand: deviceBrand.trim() || "Standard",
         deviceInventory: deviceInventory.trim() || "N/A",
         rawNotes: rawNotes.trim(),
@@ -730,13 +806,19 @@ export default function NewInterventionForm({
         signatureDate: status === "termine" ? date : undefined,
         preferredService: preferredService || undefined,
         techSignature: techProfile?.savedSignature || undefined,
-        techValidatingDept: techProfile?.validatingDept || undefined
+        techValidatingDept: techProfile?.validatingDept || undefined,
+        ficheType,
+        equipRef: ficheType === "attribution" ? equipRef : undefined,
+        techNote: ficheType === "attribution" ? techNote : undefined,
+        restitutionDetails: ficheType === "attribution" ? restitutionDetails : undefined,
+        dafName: dafName.trim() || undefined
       }, index, beneficiaryList.length);
     });
 
     // Reset Form
     setClientName("");
     setClientTitle("");
+    setClientDepartment("");
     setDeviceBrand("");
     setDeviceInventory("");
     setRawNotes("");
@@ -747,10 +829,67 @@ export default function NewInterventionForm({
     setBeneficiaries([]);
     setEditingBeneficiaryIdx(null);
     setPreferredService("");
+    setEquipRef("");
+    setTechNote("");
+    setRestitutionDetails("");
   };
 
   return (
     <form id="new-intervention-form" onSubmit={handleSubmit} className="space-y-6">
+      {/* Fiche Type Switcher */}
+      <div className={`rounded-xl border-2 p-4 transition-all duration-300 ${
+        isDark ? "bg-slate-900/80 border-slate-800" : "bg-white border-slate-200/80 shadow-sm"
+      }`}>
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+          <span className={`text-xs font-bold uppercase tracking-wider shrink-0 ${
+            isDark ? "text-slate-400" : "text-slate-500"
+          }`}>
+            Type de document :
+          </span>
+          <div className="flex gap-2 w-full sm:w-auto">
+            <button
+              type="button"
+              onClick={() => setFicheType("intervention")}
+              className={`flex-1 sm:flex-none flex items-center gap-2 px-4 py-2.5 rounded-lg text-xs font-semibold transition-all duration-200 cursor-pointer border ${
+                ficheType === "intervention"
+                  ? isDark
+                    ? "bg-teal-950/60 text-teal-300 border-teal-700/60 shadow-md shadow-teal-900/30"
+                    : "bg-teal-50 text-teal-800 border-teal-300 shadow-md shadow-teal-100"
+                  : isDark
+                    ? "bg-slate-950/40 text-slate-400 border-slate-800 hover:border-slate-700"
+                    : "bg-slate-50 text-slate-500 border-slate-200 hover:border-slate-300"
+              }`}
+            >
+              <FileText className="w-4 h-4" />
+              Fiche d'Intervention IT
+            </button>
+            <button
+              type="button"
+              onClick={() => setFicheType("attribution")}
+              className={`flex-1 sm:flex-none flex items-center gap-2 px-4 py-2.5 rounded-lg text-xs font-semibold transition-all duration-200 cursor-pointer border ${
+                ficheType === "attribution"
+                  ? isDark
+                    ? "bg-indigo-950/60 text-indigo-300 border-indigo-700/60 shadow-md shadow-indigo-900/30"
+                    : "bg-indigo-50 text-indigo-800 border-indigo-300 shadow-md shadow-indigo-100"
+                  : isDark
+                    ? "bg-slate-950/40 text-slate-400 border-slate-800 hover:border-slate-700"
+                    : "bg-slate-50 text-slate-500 border-slate-200 hover:border-slate-300"
+              }`}
+            >
+              <Package className="w-4 h-4" />
+              Fiche d'Attribution & Restitution
+            </button>
+          </div>
+        </div>
+        {ficheType === "attribution" && (
+          <p className={`mt-3 text-[11px] leading-relaxed px-1 ${
+            isDark ? "text-indigo-400/70" : "text-indigo-600/70"
+          }`}>
+            Ce mode génère une Fiche d'Attribution et de Restitution de Matériel officielle du CNIPLC. Décrivez le matériel attribué, les caractéristiques et l'état dans les notes brutes, puis laissez l'IA structurer le document.
+          </p>
+        )}
+      </div>
+
       {/* Dynamic Voice Recording Assist Card */}
       <div className={`border-2 border-dashed rounded-xl p-6 transition-all duration-200 ${
         isVoiceRecording 
@@ -1021,7 +1160,6 @@ export default function NewInterventionForm({
             </div>
           </div>
         )}
-
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
           {/* Client Name */}
           <div className="space-y-1.5">
@@ -1052,7 +1190,7 @@ export default function NewInterventionForm({
                 }}
                 list="employees-list"
                 className={`flex-1 text-sm px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 ${
-                  isDark ? "bg-slate-950 border-slate-800 text-white placeholder:text-slate-650" : "bg-white border-slate-200 text-slate-800"
+                  isDark ? "bg-slate-950 border-slate-800 text-white placeholder:text-slate-655" : "bg-white border-slate-200 text-slate-800"
                 }`}
               />
               {isMultiBeneficiary && (
@@ -1088,7 +1226,7 @@ export default function NewInterventionForm({
             <label className={`block text-xs font-semibold uppercase tracking-wider ${
               isDark ? "text-slate-300" : "text-slate-700"
             }`}>
-              Titre / Fonction officielle
+              {isMultiBeneficiary ? "Titre / Fonction (Bénéficiaire en cours)" : "Titre / Fonction officielle"}
             </label>
             <input
               id="input-client-title"
@@ -1097,7 +1235,7 @@ export default function NewInterventionForm({
               value={clientTitle}
               onChange={(e) => setClientTitle(e.target.value)}
               className={`w-full text-sm px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 ${
-                isDark ? "bg-slate-950 border-slate-800 text-white placeholder:text-slate-650" : "bg-white border-slate-200 text-slate-800"
+                isDark ? "bg-slate-950 border-slate-800 text-white placeholder:text-slate-655" : "bg-white border-slate-200 text-slate-800"
               }`}
             />
           </div>
@@ -1107,7 +1245,7 @@ export default function NewInterventionForm({
             <label className={`block text-xs font-semibold uppercase tracking-wider ${
               isDark ? "text-slate-300" : "text-slate-700"
             }`}>
-              Département / Direction d'État
+              {isMultiBeneficiary ? "Département (Bénéficiaire en cours)" : "Département / Direction d'État"}
             </label>
             <input
               id="input-client-dept"
@@ -1147,97 +1285,196 @@ export default function NewInterventionForm({
           </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-5 mt-5">
-          {/* Equipment Type */}
-          <div className="space-y-1.5">
-            <label className={`block text-xs font-semibold uppercase tracking-wider ${
-              isDark ? "text-slate-300" : "text-slate-700"
-            }`}>
-              Type de Matériel
-            </label>
-            <input
-              id="input-device-type"
-              type="text"
-              placeholder="ex: PC Portable, Imprimante, Switch..."
-              value={deviceType}
-              onChange={(e) => setDeviceType(e.target.value)}
-              list="device-types-list"
-              className={`w-full text-sm px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 ${
-                isDark ? "bg-slate-950 border-slate-800 text-white placeholder:text-slate-650" : "bg-white border-slate-200 text-slate-800"
-              }`}
-            />
-            <datalist id="device-types-list">
-              {DEVICE_TYPES.map((type) => (
-                <option key={type.value} value={type.value} />
-              ))}
-            </datalist>
-          </div>
+        {/* Equipment & Date Fields - conditional on fiche type */}
+        {ficheType === "intervention" ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-5 mt-5">
+            {/* Equipment Type */}
+            <div className="space-y-1.5">
+              <label className={`block text-xs font-semibold uppercase tracking-wider ${
+                isDark ? "text-slate-300" : "text-slate-700"
+              }`}>
+                Type de Matériel
+              </label>
+              <input
+                id="input-device-type"
+                type="text"
+                placeholder="ex: PC Portable, Imprimante, Switch..."
+                value={deviceType}
+                onChange={(e) => setDeviceType(e.target.value)}
+                list="device-types-list"
+                className={`w-full text-sm px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 ${
+                  isDark ? "bg-slate-950 border-slate-800 text-white placeholder:text-slate-650" : "bg-white border-slate-200 text-slate-800"
+                }`}
+              />
+              <datalist id="device-types-list">
+                {DEVICE_TYPES.map((type) => (
+                  <option key={type.value} value={type.value} />
+                ))}
+              </datalist>
+            </div>
 
-          {/* Device Brand */}
-          <div className="space-y-1.5">
-            <label className={`block text-xs font-semibold uppercase tracking-wider ${
-              isDark ? "text-slate-300" : "text-slate-700"
-            }`}>
-              Modèle / Marque
-            </label>
-            <input
-              id="input-device-brand"
-              type="text"
-              placeholder="ex: HP LaserJet M404 / Dell Vostro"
-              value={deviceBrand}
-              onChange={(e) => setDeviceBrand(e.target.value)}
-              className={`w-full text-sm px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 ${
-                isDark ? "bg-slate-950 border-slate-800 text-white placeholder:text-slate-650" : "bg-white border-slate-200 text-slate-800"
-              }`}
-            />
-          </div>
+            {/* Device Brand */}
+            <div className="space-y-1.5">
+              <label className={`block text-xs font-semibold uppercase tracking-wider ${
+                isDark ? "text-slate-300" : "text-slate-700"
+              }`}>
+                Modèle / Marque
+              </label>
+              <input
+                id="input-device-brand"
+                type="text"
+                placeholder="ex: HP LaserJet M404 / Dell Vostro"
+                value={deviceBrand}
+                onChange={(e) => setDeviceBrand(e.target.value)}
+                className={`w-full text-sm px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 ${
+                  isDark ? "bg-slate-950 border-slate-800 text-white placeholder:text-slate-650" : "bg-white border-slate-200 text-slate-800"
+                }`}
+              />
+            </div>
 
-          {/* Service de préférence */}
-          <div className="space-y-1.5">
-            <label className={`block text-xs font-semibold uppercase tracking-wider flex items-center gap-1 ${
-              isDark ? "text-slate-300" : "text-slate-700"
-            }`}>
-              <Star className="w-3.5 h-3.5 text-amber-500" />
-              Service de préférence
-            </label>
-            <select
-              id="select-preferred-service"
-              value={preferredService}
-              onChange={(e) => setPreferredService(e.target.value)}
-              className={`w-full text-sm px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 ${
-                isDark ? "bg-slate-950 border-slate-800 text-white focus:bg-slate-950" : "bg-white border-slate-200 text-slate-800"
-              }`}
-            >
-              <option value="">-- Aucun --</option>
-              <option value="Dépannage Urgent">Dépannage Urgent</option>
-              <option value="Maintenance Préventive">Maintenance Préventive</option>
-              <option value="Installation de Matériel">Installation de Matériel</option>
-              <option value="Configuration Réseau">Configuration Réseau</option>
-              <option value="Assistance Utilisateur">Assistance Utilisateur</option>
-              <option value="Formation Technique">Formation Technique</option>
-              <option value="Audit et Contrôle">Audit et Contrôle</option>
-              <option value="Intervention d'Urgence">Intervention d'Urgence</option>
-            </select>
-          </div>
+            {/* Service de préférence */}
+            <div className="space-y-1.5">
+              <label className={`block text-xs font-semibold uppercase tracking-wider flex items-center gap-1 ${
+                isDark ? "text-slate-300" : "text-slate-700"
+              }`}>
+                <Star className="w-3.5 h-3.5 text-amber-500" />
+                Service de préférence
+              </label>
+              <select
+                id="select-preferred-service"
+                value={preferredService}
+                onChange={(e) => setPreferredService(e.target.value)}
+                className={`w-full text-sm px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 ${
+                  isDark ? "bg-slate-950 border-slate-800 text-white focus:bg-slate-950" : "bg-white border-slate-200 text-slate-800"
+                }`}
+              >
+                <option value="">-- Aucun --</option>
+                <option value="Dépannage Urgent">Dépannage Urgent</option>
+                <option value="Maintenance Préventive">Maintenance Préventive</option>
+                <option value="Installation de Matériel">Installation de Matériel</option>
+                <option value="Configuration Réseau">Configuration Réseau</option>
+                <option value="Assistance Utilisateur">Assistance Utilisateur</option>
+                <option value="Formation Technique">Formation Technique</option>
+                <option value="Audit et Contrôle">Audit et Contrôle</option>
+                <option value="Intervention d'Urgence">Intervention d'Urgence</option>
+              </select>
+            </div>
 
-          {/* Date */}
-          <div className="space-y-1.5">
-            <label className={`block text-xs font-semibold uppercase tracking-wider ${
-              isDark ? "text-slate-300" : "text-slate-700"
-            }`}>
-              Date d'intervention
-            </label>
-            <input
-              id="input-date"
-              type="date"
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
-              className={`w-full text-sm px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 ${
-                isDark ? "bg-slate-950 border-slate-800 text-white focus:bg-slate-950" : "bg-white border-slate-200 text-slate-805"
-              }`}
-            />
+            {/* Date */}
+            <div className="space-y-1.5">
+              <label className={`block text-xs font-semibold uppercase tracking-wider ${
+                isDark ? "text-slate-300" : "text-slate-700"
+              }`}>
+                Date d'intervention
+              </label>
+              <input
+                id="input-date"
+                type="date"
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+                className={`w-full text-sm px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 ${
+                  isDark ? "bg-slate-950 border-slate-800 text-white focus:bg-slate-950" : "bg-white border-slate-200 text-slate-805"
+                }`}
+              />
+            </div>
           </div>
-        </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-5 mt-5">
+            {/* Equipment Reference */}
+            <div className="space-y-1.5">
+              <label className={`block text-xs font-semibold uppercase tracking-wider ${
+                isDark ? "text-slate-300" : "text-slate-700"
+              }`}>
+                Référence de l'Équipement
+              </label>
+              <input
+                id="input-equip-ref"
+                type="text"
+                placeholder="ex: Don N° 2100155041968"
+                value={equipRef}
+                onChange={(e) => setEquipRef(e.target.value)}
+                className={`w-full text-sm px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 ${
+                  isDark ? "bg-slate-950 border-slate-800 text-white placeholder:text-slate-655" : "bg-white border-slate-200 text-slate-800"
+                }`}
+              />
+            </div>
+
+            {/* DAF Name */}
+            <div className="space-y-1.5">
+              <label className={`block text-xs font-semibold uppercase tracking-wider ${
+                isDark ? "text-slate-300" : "text-slate-700"
+              }`}>
+                Nom du DAF (Signataire)
+              </label>
+              <input
+                id="input-daf-name"
+                type="text"
+                placeholder="ex: Mr. YACIN SAID"
+                value={dafName}
+                onChange={(e) => setDafName(e.target.value)}
+                className={`w-full text-sm px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 ${
+                  isDark ? "bg-slate-950 border-slate-800 text-white placeholder:text-slate-655" : "bg-white border-slate-200 text-slate-800"
+                }`}
+              />
+            </div>
+
+            {/* Date */}
+            <div className="space-y-1.5">
+              <label className={`block text-xs font-semibold uppercase tracking-wider ${
+                isDark ? "text-slate-300" : "text-slate-700"
+              }`}>
+                Date d'attribution
+              </label>
+              <input
+                id="input-date-attribution"
+                type="date"
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+                className={`w-full text-sm px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 ${
+                  isDark ? "bg-slate-950 border-slate-800 text-white focus:bg-slate-950" : "bg-white border-slate-200 text-slate-850"
+                }`}
+              />
+            </div>
+
+            {/* Restitution Details */}
+            <div className="space-y-1.5 sm:col-span-2 md:col-span-2">
+              <label className={`block text-xs font-semibold uppercase tracking-wider ${
+                isDark ? "text-slate-300" : "text-slate-700"
+              }`}>
+                Détails de Restitution de l'ancien matériel (optionnel)
+              </label>
+              <textarea
+                id="textarea-restitution"
+                rows={2}
+                placeholder="ex: Restitution d'un ancien PC Bureau HP Compaq 6300 Pro - état: Usagé, numéro inventaire: INV-2019-0045"
+                value={restitutionDetails}
+                onChange={(e) => setRestitutionDetails(e.target.value)}
+                className={`w-full text-sm p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none ${
+                  isDark ? "bg-slate-950 border-slate-800 text-white placeholder:text-slate-655" : "bg-white border-slate-200 text-slate-800"
+                }`}
+              />
+            </div>
+
+            {/* Tech Note */}
+            <div className="space-y-1.5">
+              <label className={`block text-xs font-semibold uppercase tracking-wider ${
+                isDark ? "text-slate-300" : "text-slate-700"
+              }`}>
+                Note Technique (optionnel)
+              </label>
+              <textarea
+                id="textarea-tech-note"
+                rows={2}
+                placeholder="ex: Configuration réseau, installation Windows 11 Pro, mise à jour BIOS..."
+                value={techNote}
+                onChange={(e) => setTechNote(e.target.value)}
+                className={`w-full text-sm p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none ${
+                  isDark ? "bg-slate-950 border-slate-800 text-white placeholder:text-slate-655" : "bg-white border-slate-200 text-slate-800"
+                }`}
+              />
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -1249,25 +1486,31 @@ export default function NewInterventionForm({
             <h3 className={`text-base font-bold border-b pb-3 mb-1 flex items-center justify-between ${
               isDark ? "border-slate-800 text-slate-100" : "border-slate-105 text-slate-900"
             }`}>
-              <span>2. Saisie Rapide des Notes de Prestation</span>
-              <span className="text-xs font-bold text-slate-400 font-mono">Notes brutes</span>
+              <span>{ficheType === "attribution" ? "2. Description du Matériel Attribué" : "2. Saisie Rapide des Notes de Prestation"}</span>
+              <span className="text-xs font-bold text-slate-400 font-mono">{ficheType === "attribution" ? "Attribution" : "Notes brutes"}</span>
             </h3>
 
             <p className="text-xs text-slate-500 leading-normal">
-              Écrivez ici vos notes de travail comme vous le feriez à la volée durant le dépannage informatique. Notre moteur d'IA administrative formulera un rapport de haut niveau à présenter au Directeur.
+              {ficheType === "attribution"
+                ? "Décrivez le matériel attribué, ses caractéristiques techniques et son état. Notre moteur d'IA structurera les informations en désignation, caractéristiques et état."
+                : "Écrivez ici vos notes de travail comme vous le feriez à la volée durant le dépannage informatique. Notre moteur d'IA administrative formulera un rapport de haut niveau à présenter au Directeur."}
             </p>
 
             <div className="space-y-2">
               <label className={`block text-xs font-semibold uppercase tracking-wider ${
                 isDark ? "text-slate-300" : "text-slate-700"
               }`}>
-                Vos notes brutes (Que s'est-il passé, qu'avez-vous résolu ?) *
+                {ficheType === "attribution"
+                  ? "Description brute du matériel (Désignation, spécifications, état) *"
+                  : "Vos notes brutes (Que s'est-il passé, qu'avez-vous résolu ?) *"}
               </label>
               <textarea
                 id="textarea-raw-notes"
                 rows={4}
                 required
-                placeholder="Rédigez succinctement (ex: depan pc ram lent, ajouter 8go ddr4 dell, suppression adware malware, depoussierage complet)"
+                placeholder={ficheType === "attribution"
+                  ? "ex: unite centrale intel core i5 11eme gen, 8go ram ddr4, ssd 256go, ecran 24 pouces samsung neuf..."
+                  : "Rédigez succinctement (ex: depan pc ram lent, ajouter 8go ddr4 dell, suppression adware malware, depoussierage complet)"}
                 value={rawNotes}
                 onChange={(e) => setRawNotes(e.target.value)}
                 className={`w-full text-sm p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 resize-none ${
@@ -1328,7 +1571,11 @@ export default function NewInterventionForm({
               }`}
             >
               <Sparkles className={`w-4 h-4 text-teal-605 ${isAiLoading ? "animate-spin" : ""}`} />
-              {isAiLoading ? "Traitement par l'IA CNIPLC..." : "Générer les termes professionnels par IA"}
+              {isAiLoading
+                ? "Traitement par l'IA CNIPLC..."
+                : ficheType === "attribution"
+                  ? "Structurer l'attribution par IA"
+                  : "Générer les termes professionnels par IA"}
             </button>
             <div className="flex items-center gap-2">
               <div className="text-xs font-semibold text-slate-500 font-mono">DURÉE (MINUTES) :</div>
