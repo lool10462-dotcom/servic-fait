@@ -298,7 +298,16 @@ export default function App({ embedded = false }: AppProps) {
     setInterventions(updatedList);
 
     try {
-      await saveIntervention(fullIntervention);
+      // Strip large base64 fields before saving to Supabase to prevent payload size errors
+      const sanitizedForSupabase = { ...fullIntervention };
+      // Remove photos (base64 images are very large)
+      delete (sanitizedForSupabase as any).photos;
+      // Remove signature base64 data (already embedded in PDF/Word downloads)
+      delete (sanitizedForSupabase as any).techSignature;
+      delete (sanitizedForSupabase as any).dafSignature;
+      delete (sanitizedForSupabase as any).agentSignature;
+      
+      await saveIntervention(sanitizedForSupabase);
       
       // Check auto-cleanup (passing the directory handle so it saves locally)
       const cleaned = await checkAndCleanupInterventions(updatedList, localDirHandle);

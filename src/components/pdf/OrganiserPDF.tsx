@@ -195,46 +195,63 @@ export default function OrganiserPDF({ onBack }: OrganiserPDFProps) {
 
       for (const file of sourceFiles) {
         if (!file.id.startsWith("img-")) {
-          loadedDocs[file.id] = await PDFDocument.load(file.buffer);
+          try {
+            loadedDocs[file.id] = await PDFDocument.load(file.buffer, { ignoreEncryption: true });
+          } catch (loadErr) {
+            console.warn(`Skipping corrupted/encrypted source file ${file.name}:`, loadErr);
+          }
         }
       }
 
       for (const pageItem of pages) {
-        if (pageItem.isImage) {
-          const file = sourceFiles.find(f => f.id === pageItem.sourceFileId);
-          if (file) {
-            const newPage = destDoc.addPage([595.28, 841.89]); // A4
-            let embeddedImage;
-            if (pageItem.imageType === "image/png") {
-              embeddedImage = await destDoc.embedPng(file.buffer);
-            } else {
-              embeddedImage = await destDoc.embedJpg(file.buffer);
-            }
-            const { width, height } = embeddedImage.scale(1);
-            const scale = Math.min(595.28 / width, 841.89 / height);
-            const x = (595.28 - width * scale) / 2;
-            const y = (841.89 - height * scale) / 2;
-            
-            newPage.drawImage(embeddedImage, {
-              x,
-              y,
-              width: width * scale,
-              height: height * scale
-            });
+        try {
+          if (pageItem.isImage) {
+            const file = sourceFiles.find(f => f.id === pageItem.sourceFileId);
+            if (file) {
+              const newPage = destDoc.addPage([595.28, 841.89]); // A4
+              let embeddedImage;
+              if (pageItem.imageType === "image/png") {
+                embeddedImage = await destDoc.embedPng(file.buffer);
+              } else {
+                embeddedImage = await destDoc.embedJpg(file.buffer);
+              }
+              const { width, height } = embeddedImage.scale(1);
+              const scale = Math.min(595.28 / width, 841.89 / height);
+              const x = (595.28 - width * scale) / 2;
+              const y = (841.89 - height * scale) / 2;
+              
+              newPage.drawImage(embeddedImage, {
+                x,
+                y,
+                width: width * scale,
+                height: height * scale
+              });
 
-            if (pageItem.rotation > 0) {
-              newPage.setRotation(degrees(pageItem.rotation));
+              if (pageItem.rotation > 0) {
+                newPage.setRotation(degrees(pageItem.rotation));
+              }
+            }
+          } else {
+            const srcDoc = loadedDocs[pageItem.sourceFileId];
+            if (srcDoc) {
+              const srcPageCount = srcDoc.getPageCount();
+              const pageIndex = Math.min(pageItem.sourcePageIndex, srcPageCount - 1);
+              if (pageIndex >= 0 && pageIndex < srcPageCount) {
+                const [copiedPage] = await destDoc.copyPages(srcDoc, [pageIndex]);
+                const currentRotation = copiedPage.getRotation().angle;
+                copiedPage.setRotation(degrees((currentRotation + pageItem.rotation) % 360));
+                destDoc.addPage(copiedPage);
+              }
             }
           }
-        } else {
-          const srcDoc = loadedDocs[pageItem.sourceFileId];
-          if (srcDoc) {
-            const [copiedPage] = await destDoc.copyPages(srcDoc, [pageItem.sourcePageIndex]);
-            const currentRotation = copiedPage.getRotation().angle;
-            copiedPage.setRotation(degrees((currentRotation + pageItem.rotation) % 360));
-            destDoc.addPage(copiedPage);
-          }
+        } catch (pageErr) {
+          console.warn(`Skipping page ${pageItem.id} due to error:`, pageErr);
         }
+      }
+
+      if (destDoc.getPageCount() === 0) {
+        alert("Aucune page n'a pu être compilée. Vérifiez que les fichiers PDF ne sont pas corrompus ou protégés.");
+        return;
       }
 
       const pdfBytes = await destDoc.save();
@@ -247,7 +264,6 @@ export default function OrganiserPDF({ onBack }: OrganiserPDFProps) {
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
-      onBack();
     } catch (err) {
       console.error(err);
       alert("Une erreur est survenue lors de la compilation du PDF.");
