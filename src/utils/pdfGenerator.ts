@@ -359,24 +359,27 @@ export async function generateAndDownloadPDF(intervention: Intervention, directo
 
   // 7. COMMITMENT STATEMENT
   currentY += 8;
-  doc.setFillColor(253, 250, 242);
-  doc.roundedRect(15, currentY, 180, 18, 1, 1, "F");
-  doc.setDrawColor(242, 223, 174);
-  doc.roundedRect(15, currentY, 180, 18, 1, 1, "D");
-
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(7);
-  doc.setTextColor(115, 115, 115);
-  
   const declaration = intervention.ficheType === "attribution"
     ? "Déclaration administrative : Ce document atteste de l'attribution effective du matériel informatique décrit ci-dessus par les services techniques du CNIPLC au bénéficiaire désigné. Le signataire du DAF, le bénéficiaire et le technicien informatique attestent par leurs signatures respectives que le matériel a été remis en bon état, configuré et opérationnel."
     : "Déclaration administrative : Ce document atteste de la réalisation effective des travaux de dépannage, d'assistance, d'installation d'équipements ou de maintenance réseau décrits ci-dessus par les services informatiques d'État (CNIPLC). Le bénéficiaire atteste par sa signature que les systèmes informatiques mentionnés sont réparés, fonctionnels et conformes aux exigences professionnelles.";
   const wrappedDecl = doc.splitTextToSize(declaration, 172);
+  const declBoxHeight = Math.max(16, wrappedDecl.length * 3.6 + 4);
+
+  doc.setFillColor(253, 250, 242);
+  doc.roundedRect(15, currentY, 180, declBoxHeight, 1, 1, "F");
+  doc.setDrawColor(242, 223, 174);
+  doc.roundedRect(15, currentY, 180, declBoxHeight, 1, 1, "D");
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(7.5);
+  doc.setTextColor(115, 115, 115);
   doc.text(wrappedDecl, 19, currentY + 4.5);
+
+  currentY += declBoxHeight;
 
   // Restitution & Tech Note blocks (Attribution only)
   if (intervention.ficheType === "attribution" && intervention.restitutionDetails) {
-    currentY += 22;
+    currentY += 6;
     if (currentY > 240) { doc.addPage(); currentY = 20; }
     doc.setFont("helvetica", "bold");
     doc.setFontSize(8);
@@ -392,6 +395,7 @@ export async function generateAndDownloadPDF(intervention: Intervention, directo
   }
 
   if (intervention.ficheType === "attribution" && intervention.techNote) {
+    currentY += 6;
     if (currentY > 245) { doc.addPage(); currentY = 20; }
     doc.setFont("helvetica", "bold");
     doc.setFontSize(8);
@@ -407,7 +411,7 @@ export async function generateAndDownloadPDF(intervention: Intervention, directo
   }
 
   // 8. TRIPLE SIGNATURES
-  currentY += 6;
+  currentY += 8;
   if (currentY > 235) { doc.addPage(); currentY = 20; }
 
   const sigBoxWidth = 58;
