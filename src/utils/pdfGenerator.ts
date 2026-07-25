@@ -363,7 +363,7 @@ export async function generateAndDownloadPDF(intervention: Intervention, directo
     ? "Déclaration administrative : Ce document atteste de l'attribution effective du matériel informatique décrit ci-dessus par les services techniques du CNIPLC au bénéficiaire désigné. Le signataire du DAF, le bénéficiaire et le technicien informatique attestent par leurs signatures respectives que le matériel a été remis en bon état, configuré et opérationnel."
     : "Déclaration administrative : Ce document atteste de la réalisation effective des travaux de dépannage, d'assistance, d'installation d'équipements ou de maintenance réseau décrits ci-dessus par les services informatiques d'État (CNIPLC). Le bénéficiaire atteste par sa signature que les systèmes informatiques mentionnés sont réparés, fonctionnels et conformes aux exigences professionnelles.";
   const wrappedDecl = doc.splitTextToSize(declaration, 172);
-  const declBoxHeight = Math.max(16, wrappedDecl.length * 3.6 + 4);
+  const declBoxHeight = Math.max(18, wrappedDecl.length * 4.2 + 5);
 
   doc.setFillColor(253, 250, 242);
   doc.roundedRect(15, currentY, 180, declBoxHeight, 1, 1, "F");
@@ -371,11 +371,37 @@ export async function generateAndDownloadPDF(intervention: Intervention, directo
   doc.roundedRect(15, currentY, 180, declBoxHeight, 1, 1, "D");
 
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(7.5);
+  doc.setFontSize(9.0);
   doc.setTextColor(115, 115, 115);
-  doc.text(wrappedDecl, 19, currentY + 4.5);
+  doc.text(wrappedDecl, 19, currentY + 5.5);
 
   currentY += declBoxHeight;
+
+  // Add "Fait à Djibouti le ..." in Times Bold (serif)
+  currentY += 6;
+  if (currentY > 240) { doc.addPage(); currentY = 20; }
+
+  const rawDate = intervention.signatureDate || intervention.date || new Date().toISOString();
+  let dateFormatted = "";
+  try {
+    const d = new Date(rawDate);
+    if (isNaN(d.getTime())) {
+      dateFormatted = rawDate;
+    } else {
+      const day = String(d.getDate()).padStart(2, '0');
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const year = d.getFullYear();
+      dateFormatted = `${day}/${month}/${year}`;
+    }
+  } catch {
+    dateFormatted = rawDate;
+  }
+
+  doc.setFont("times", "bold");
+  doc.setFontSize(11);
+  doc.setTextColor(15, 23, 42);
+  doc.text(`Fait à Djibouti le ${dateFormatted}`, 15, currentY);
+
 
   // Restitution & Tech Note blocks (Attribution only)
   if (intervention.ficheType === "attribution" && intervention.restitutionDetails) {
@@ -422,12 +448,12 @@ export async function generateAndDownloadPDF(intervention: Intervention, directo
   // Box 1: DAF
   doc.rect(sigStartX, currentY, sigBoxWidth, sigBoxHeight);
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(8);
+  doc.setFontSize(9);
   doc.setTextColor(15, 23, 42);
   doc.text("LE DIRECTEUR ADMINISTRATIF", sigStartX + 2, currentY + 5);
   doc.text("ET FINANCIER", sigStartX + 2, currentY + 9);
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(8.5);
+  doc.setFontSize(9.5);
   doc.setTextColor(100, 116, 139);
   doc.text(intervention.dafName || "Le DAF", sigStartX + 2, currentY + 13);
 
@@ -435,24 +461,20 @@ export async function generateAndDownloadPDF(intervention: Intervention, directo
     try { doc.addImage(intervention.dafSignature, "PNG", sigStartX + 8, currentY + 14, 40, 10); } catch {}
   }
 
-  doc.line(sigStartX, currentY + 25, sigStartX + sigBoxWidth, currentY + 25);
-  doc.setFontSize(8);
-  doc.text("Date : ___ / ___ / ______", sigStartX + 2, currentY + 29);
-
   // Box 2: Bénéficiaire
   const sig2X = sigStartX + sigBoxWidth + sigGap;
   doc.rect(sig2X, currentY, sigBoxWidth, sigBoxHeight);
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(8);
+  doc.setFontSize(9);
   doc.setTextColor(15, 23, 42);
   doc.text("LE BÉNÉFICIAIRE", sig2X + 2, currentY + 5);
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(8.5);
+  doc.setFontSize(9.5);
   doc.setTextColor(100, 116, 139);
   doc.text(intervention.clientName, sig2X + 2, currentY + 9);
   if (intervention.preferredService) {
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(6.5);
+    doc.setFontSize(7.5);
     doc.setTextColor(15, 118, 110);
     doc.text(intervention.preferredService.toUpperCase(), sig2X + 2, currentY + 13);
   }
@@ -461,24 +483,18 @@ export async function generateAndDownloadPDF(intervention: Intervention, directo
     try { doc.addImage(intervention.agentSignature, "PNG", sig2X + 8, currentY + 14, 40, 10); } catch {}
   }
 
-  doc.line(sig2X, currentY + 25, sig2X + sigBoxWidth, currentY + 25);
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(8);
-  doc.setTextColor(100, 116, 139);
-  doc.text("Date : ___ / ___ / ______", sig2X + 2, currentY + 29);
-
   // Box 3: Technicien IT
   const sig3X = sig2X + sigBoxWidth + sigGap;
   doc.rect(sig3X, currentY, sigBoxWidth, sigBoxHeight);
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(8);
+  doc.setFontSize(9);
   doc.setTextColor(15, 23, 42);
   doc.text("LE TECHNICIEN INFORMATIQUE", sig3X + 2, currentY + 5);
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(8.5);
+  doc.setFontSize(9.5);
   doc.setTextColor(100, 116, 139);
   doc.text(intervention.techName, sig3X + 2, currentY + 9);
-  doc.setFontSize(7.5);
+  doc.setFontSize(8);
   doc.setTextColor(148, 163, 184);
   doc.text(intervention.techValidatingDept || "CNIPLC Informatique", sig3X + 2, currentY + 13);
 
@@ -487,11 +503,6 @@ export async function generateAndDownloadPDF(intervention: Intervention, directo
       console.error("Failed to add tech signature to PDF", err);
     }
   }
-
-  doc.line(sig3X, currentY + 25, sig3X + sigBoxWidth, currentY + 25);
-  doc.setFontSize(7.5);
-  doc.setTextColor(100, 116, 139);
-  doc.text(`Date : ${intervention.signatureDate ? new Date(intervention.signatureDate).toLocaleDateString('fr-FR') : new Date().toLocaleDateString('fr-FR')}`, sig3X + 2, currentY + 29);
 
   // Clean save action
   const prefix = intervention.ficheType === "attribution" ? "Attribution" : "Intervention";

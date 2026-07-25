@@ -794,37 +794,61 @@ export async function generateWordBlob(
   }
 
   // Declaration
+  const rawDate = intervention.signatureDate || intervention.date || new Date().toISOString();
+  let dateFormatted = "";
+  try {
+    const d = new Date(rawDate);
+    if (isNaN(d.getTime())) {
+      dateFormatted = rawDate;
+    } else {
+      const day = String(d.getDate()).padStart(2, '0');
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const year = d.getFullYear();
+      dateFormatted = `${day}/${month}/${year}`;
+    }
+  } catch {
+    dateFormatted = rawDate;
+  }
+
   headerChildren.push(
     new Paragraph({ spacing: { before: 120 }, children: [] }),
     new Paragraph({
-      spacing: { after: 60 },
+      spacing: { after: 120 },
       alignment: AlignmentType.JUSTIFIED,
       shading: { type: ShadingType.SOLID, color: "F8FAFC" },
       children: [
         new TextRun({
           text: "Déclaration administrative : ",
           bold: true,
-          size: 16,
+          size: 20,
           font: "Calibri",
           color: "64748B",
         }),
         new TextRun({
           text: isAttribution
             ? "Ce document atteste de l'attribution effective du matériel informatique décrit ci-dessus par les services techniques du CNIPLC au bénéficiaire désigné. Le signataire du DAF, le bénéficiaire et le technicien informatique attestent par leurs signatures respectives que le matériel a été remis en bon état, configuré et opérationnel."
-            : "Ce document atteste de la réalisation effective des travaux décrits ci-dessus par les services informatiques d'État (CNIPLC). Le bénéficiaire atteste par sa signature que les systèmes informatiques mentionnés sont réparés, fonctionnels et conformes aux exigences professionnelles.",
-          size: 16,
+            : "Ce document atteste de la réalisation effective des travaux de dépannage, d'assistance, d'installation d'équipements ou de maintenance réseau décrits ci-dessus par les services informatiques d'État (CNIPLC). Le bénéficiaire atteste par sa signature que les systèmes informatiques mentionnés sont réparés, fonctionnels et conformes aux exigences professionnelles.",
+          size: 20,
           font: "Calibri",
           color: "64748B",
+        }),
+      ],
+    }),
+    new Paragraph({
+      spacing: { before: 120, after: 180 },
+      children: [
+        new TextRun({
+          text: `Fait à Djibouti le ${dateFormatted}`,
+          bold: true,
+          size: 22,
+          font: "Georgia",
+          color: "1E293B",
         }),
       ],
     })
   );
 
   // Triple Signature Table
-  const sigDate = intervention.signatureDate
-    ? formatDateFR(intervention.signatureDate)
-    : "___ / ___ / ______";
-
   const signatureTable = new Table({
     width: { size: 100, type: WidthType.PERCENTAGE },
     layout: TableLayoutType.FIXED,
@@ -839,25 +863,12 @@ export async function generateWordBlob(
             verticalAlign: VerticalAlign.TOP,
             children: [
               new Paragraph({
-                spacing: { after: 20 },
+                spacing: { before: 60, after: 40 },
                 children: [
                   new TextRun({
                     text: "LE DIRECTEUR ADMINISTRATIF",
                     bold: true,
-                    size: 14,
-                    font: "Calibri",
-                    color: "1E293B",
-                    allCaps: true,
-                  }),
-                ],
-              }),
-              new Paragraph({
-                spacing: { after: 20 },
-                children: [
-                  new TextRun({
-                    text: "ET FINANCIER",
-                    bold: true,
-                    size: 14,
+                    size: 18,
                     font: "Calibri",
                     color: "1E293B",
                     allCaps: true,
@@ -868,31 +879,27 @@ export async function generateWordBlob(
                 spacing: { after: 40 },
                 children: [
                   new TextRun({
-                    text: intervention.dafName || "Le DAF",
-                    size: 16,
+                    text: "ET FINANCIER",
+                    bold: true,
+                    size: 18,
                     font: "Calibri",
-                    color: "64748B",
+                    color: "1E293B",
+                    allCaps: true,
                   }),
                 ],
               }),
-              new Paragraph({ spacing: { before: 600 }, children: [] }),
               new Paragraph({
-                border: {
-                  top: {
-                    style: BorderStyle.SINGLE,
-                    size: 1,
-                    color: "CBD5E1",
-                  },
-                },
+                spacing: { after: 80 },
                 children: [
                   new TextRun({
-                    text: `Date : ___ / ___ / ______`,
-                    size: 14,
+                    text: intervention.dafName || "Le DAF",
+                    size: 20,
                     font: "Calibri",
                     color: "64748B",
                   }),
                 ],
               }),
+              new Paragraph({ spacing: { before: 1200 }, children: [] }),
             ],
           }),
           // Agent/Bénéficiaire
@@ -902,12 +909,12 @@ export async function generateWordBlob(
             verticalAlign: VerticalAlign.TOP,
             children: [
               new Paragraph({
-                spacing: { after: 20 },
+                spacing: { before: 60, after: 40 },
                 children: [
                   new TextRun({
                     text: "LE BÉNÉFICIAIRE",
                     bold: true,
-                    size: 14,
+                    size: 18,
                     font: "Calibri",
                     color: "1E293B",
                     allCaps: true,
@@ -919,7 +926,7 @@ export async function generateWordBlob(
                 children: [
                   new TextRun({
                     text: intervention.clientName || "L'Agent",
-                    size: 16,
+                    size: 20,
                     font: "Calibri",
                     color: "64748B",
                   }),
@@ -928,11 +935,12 @@ export async function generateWordBlob(
               ...(intervention.preferredService
                 ? [
                     new Paragraph({
+                      spacing: { after: 40 },
                       children: [
                         new TextRun({
                           text: intervention.preferredService,
                           bold: true,
-                          size: 12,
+                          size: 16,
                           font: "Calibri",
                           color: "0D9488",
                           allCaps: true,
@@ -941,24 +949,7 @@ export async function generateWordBlob(
                     }),
                   ]
                 : []),
-              new Paragraph({ spacing: { before: 600 }, children: [] }),
-              new Paragraph({
-                border: {
-                  top: {
-                    style: BorderStyle.SINGLE,
-                    size: 1,
-                    color: "CBD5E1",
-                  },
-                },
-                children: [
-                  new TextRun({
-                    text: `Date : ___ / ___ / ______`,
-                    size: 14,
-                    font: "Calibri",
-                    color: "64748B",
-                  }),
-                ],
-              }),
+              new Paragraph({ spacing: { before: 1200 }, children: [] }),
             ],
           }),
           // Technicien IT
@@ -968,12 +959,12 @@ export async function generateWordBlob(
             verticalAlign: VerticalAlign.TOP,
             children: [
               new Paragraph({
-                spacing: { after: 20 },
+                spacing: { before: 60, after: 40 },
                 children: [
                   new TextRun({
                     text: "LE TECHNICIEN INFORMATIQUE",
                     bold: true,
-                    size: 14,
+                    size: 18,
                     font: "Calibri",
                     color: "1E293B",
                     allCaps: true,
@@ -981,46 +972,29 @@ export async function generateWordBlob(
                 ],
               }),
               new Paragraph({
-                spacing: { after: 20 },
+                spacing: { after: 40 },
                 children: [
                   new TextRun({
                     text: intervention.techName || "Technicien IT",
-                    size: 16,
+                    size: 20,
                     font: "Calibri",
                     color: "64748B",
                   }),
                 ],
               }),
               new Paragraph({
-                spacing: { after: 40 },
+                spacing: { after: 80 },
                 children: [
                   new TextRun({
                     text:
                       intervention.techValidatingDept || "CNIPLC Informatique",
-                    size: 12,
+                    size: 16,
                     font: "Calibri",
                     color: "94A3B8",
                   }),
                 ],
               }),
-              new Paragraph({ spacing: { before: 600 }, children: [] }),
-              new Paragraph({
-                border: {
-                  top: {
-                    style: BorderStyle.SINGLE,
-                    size: 1,
-                    color: "CBD5E1",
-                  },
-                },
-                children: [
-                  new TextRun({
-                    text: `Date : ${sigDate}`,
-                    size: 14,
-                    font: "Calibri",
-                    color: "64748B",
-                  }),
-                ],
-              }),
+              new Paragraph({ spacing: { before: 1200 }, children: [] }),
             ],
           }),
         ],
