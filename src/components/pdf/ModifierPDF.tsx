@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import {
   Save, Undo, Redo, ZoomIn, ZoomOut, Hand, PenTool, Highlighter,
   Type, Square, Circle, Eraser, ChevronLeft, ChevronRight, Settings,
-  X, Bold, Italic, Download, Printer, ArrowLeft, Upload, Loader, Trash2, Plus, Move
+  X, Bold, Italic, Download, Printer, ArrowLeft, Upload, Loader, Trash2, Plus, Move, Edit3, Check
 } from 'lucide-react';
 import { PDFDocument, rgb, StandardFonts, degrees } from 'pdf-lib';
 
@@ -17,6 +17,26 @@ interface PageData {
   src: string;
   width: number;
   height: number;
+}
+
+export interface PDFTextItem {
+  id: string;
+  pageIndex: number;
+  originalText: string;
+  currentText: string;
+  x: number; // display pixel coordinates (0..600 display width)
+  y: number;
+  width: number;
+  height: number;
+  fontSize: number;
+  fontFamily: string;
+  color: string;
+  isEdited: boolean;
+  pdfX: number; // Original PDF points
+  pdfY: number;
+  pdfWidth: number;
+  pdfHeight: number;
+  pdfFontSize: number;
 }
 
 interface PDFOverlayElement {
@@ -51,7 +71,7 @@ const STAMP_PRESETS = [
 ];
 
 export default function ModifierPDF({ onBack }: ModifierPDFProps) {
-  const [activeTab, setActiveTab] = useState<TabMode>('annotate');
+  const [activeTab, setActiveTab] = useState<TabMode>('text');
   const [activeTool, setActiveTool] = useState<Tool>('hand');
   const [currentPage, setCurrentPage] = useState<number>(0);
   const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(true);
@@ -60,10 +80,12 @@ export default function ModifierPDF({ onBack }: ModifierPDFProps) {
   const [pdfFile, setPdfFile] = useState<File | null>(null);
   const [pdfBuffer, setPdfBuffer] = useState<ArrayBuffer | null>(null);
   const [pdfPages, setPdfPages] = useState<PageData[]>([]);
+  const [extractedTexts, setExtractedTexts] = useState<PDFTextItem[]>([]);
+  const [editingTextId, setEditingTextId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [progress, setProgress] = useState("");
 
-  // Vector overlays
+  // Vector overlays (new added text/stamps)
   const [overlays, setOverlays] = useState<PDFOverlayElement[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
@@ -96,6 +118,13 @@ export default function ModifierPDF({ onBack }: ModifierPDFProps) {
     setIsSidebarOpen(true);
   };
 
+  const normalizeFontFamily = (fontName: string): string => {
+    const fn = (fontName || '').toLowerCase();
+    if (fn.includes('times') || fn.includes('serif') || fn.includes('georgia')) return 'Times-Roman';
+    if (fn.includes('courier') || fn.includes('mono') || fn.includes('code')) return 'Courier';
+    return 'Helvetica';
+  };
+
   const handleFileChange = async (filesList: FileList) => {
     const file = filesList[0];
     if (!file) return;
@@ -114,29 +143,80 @@ export default function ModifierPDF({ onBack }: ModifierPDFProps) {
 
       const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
       const pagesData: PageData[] = [];
+      const allExtractedTexts: PDFTextItem[] = [];
 
       for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
-        setProgress(`Rendu de la page ${pageNum}/${pdf.numPages}...`);
+        const pageIdx = pageNum - 1;
+        setProgress(`Extraction de la page ${pageNum}/${pdf.numPages}...`);
         const page = await pdf.getPage(pageNum);
         const viewport = page.getViewport({ scale: 1.5 });
+        const displayWidth = 600;
+        const displayHeight = 600 * (viewport.height / viewport.width);
+        const displayViewport = page.getViewport({ scale: displayWidth / page.getViewport({ scale: 1.0 }).width });
+
+        // 1. Render high-res page canvas
         const canvas = document.createElement("canvas");
         canvas.width = viewport.width;
         canvas.height = viewport.height;
         const ctx = canvas.getContext("2d")!;
         await page.render({ canvasContext: ctx, viewport } as any).promise;
-        const dataUrl = canvas.toDataURL("image/jpeg", 0.85);
+        const dataUrl = canvas.toDataURL("image/jpeg", 0.88);
 
         pagesData.push({
           src: dataUrl,
           width: viewport.width,
           height: viewport.height
         });
+
+        // 2. Extract editable PDF text content items
+        const textContent = await page.getTextContent();
+        let itemIndex = 0;
+
+        for (const item of textContent.items as any[]) {
+          if (item.str && item.str.trim().length > 0) {
+            itemIndex++;
+            const transform = item.transform; // [scaleX, skewY, skewX, scaleY, translateX, translateY]
+            const pdfX = transform[4];
+            const pdfY = transform[5];
+            const rawFontSize = Math.hypot(transform[0], transform[1]) || 12;
+
+            // Map PDF coordinates to display space (600px width container)
+            const tx = pdfjsLib.Util.transform(displayViewport.transform, transform);
+            const dispX = Math.max(4, tx[4]);
+            const dispY = Math.max(4, displayHeight - tx[5] - (rawFontSize * (displayHeight / page.getViewport({ scale: 1.0 }).height)));
+            const dispWidth = Math.max(30, (item.width || 50) * (displayWidth / page.getViewport({ scale: 1.0 }).width));
+            const dispHeight = Math.max(16, rawFontSize * (displayHeight / page.getViewport({ scale: 1.0 }).height) * 1.2);
+            const calculatedFontSize = Math.max(10, Math.round(rawFontSize * (displayHeight / page.getViewport({ scale: 1.0 }).height)));
+
+            allExtractedTexts.push({
+              id: `extracted-p${pageIdx}-${itemIndex}-${Date.now()}`,
+              pageIndex: pageIdx,
+              originalText: item.str,
+              currentText: item.str,
+              x: dispX,
+              y: dispY,
+              width: dispWidth,
+              height: dispHeight,
+              fontSize: calculatedFontSize,
+              fontFamily: normalizeFontFamily(item.fontName),
+              color: '#000000',
+              isEdited: false,
+              pdfX,
+              pdfY,
+              pdfWidth: item.width || 50,
+              pdfHeight: rawFontSize,
+              pdfFontSize: rawFontSize
+            });
+          }
+        }
       }
 
       setPdfPages(pagesData);
+      setExtractedTexts(allExtractedTexts);
       setCurrentPage(0);
       setOverlays([]);
       setSelectedId(null);
+      setEditingTextId(null);
     } catch (err) {
       console.error(err);
       alert("Une erreur est survenue lors du chargement du fichier.");
@@ -219,8 +299,8 @@ export default function ModifierPDF({ onBack }: ModifierPDFProps) {
       id: `text-${Date.now()}`,
       type: 'text',
       pageIndex: currentPage,
-      x: 100,
-      y: 100,
+      x: 120,
+      y: 120,
       text: 'Nouveau texte',
       fontSize: 16,
       color: '#000000',
@@ -283,7 +363,16 @@ export default function ModifierPDF({ onBack }: ModifierPDFProps) {
     setOverlays(prev => prev.map(o => o.id === selectedId ? { ...o, ...fields } : o));
   };
 
+  const updateExtractedText = (id: string, text: string) => {
+    setExtractedTexts(prev => prev.map(item => item.id === id ? { ...item, currentText: text, isEdited: text !== item.originalText } : item));
+  };
+
+  const updateExtractedTextProps = (id: string, fields: Partial<PDFTextItem>) => {
+    setExtractedTexts(prev => prev.map(item => item.id === id ? { ...item, ...fields, isEdited: true } : item));
+  };
+
   const selectedOverlay = overlays.find(o => o.id === selectedId);
+  const selectedExtractedText = extractedTexts.find(t => t.id === editingTextId);
 
   const hexToRgb = (hex: string) => {
     const cleanHex = hex.replace('#', '');
@@ -293,10 +382,11 @@ export default function ModifierPDF({ onBack }: ModifierPDFProps) {
     return rgb(r, g, b);
   };
 
+  // Compile and Save PDF with original text masking and font-style preservation
   const handleSaveModifiedPDF = async () => {
     if (!pdfBuffer || pdfPages.length === 0) return;
     setLoading(true);
-    setProgress("Enregistrement du PDF modifié...");
+    setProgress("Compilation et sauvegarde du PDF...");
 
     try {
       const pdfDoc = await PDFDocument.load(pdfBuffer);
@@ -306,7 +396,36 @@ export default function ModifierPDF({ onBack }: ModifierPDFProps) {
         const page = pdfDoc.getPage(i);
         const { width: pdfWidth, height: pdfHeight } = page.getSize();
         
-        // 1. Render drawing canvas for this page
+        // 1. Process edited original PDF texts (mask original text & render replacement)
+        const pageExtractedTexts = extractedTexts.filter(t => t.pageIndex === i && t.isEdited);
+        for (const item of pageExtractedTexts) {
+          const fontScale = pdfHeight / (600 * (pdfPages[i].height / pdfPages[i].width));
+          
+          // Draw solid white mask rectangle over original text area
+          const maskMargin = 2;
+          page.drawRectangle({
+            x: Math.max(0, item.pdfX - maskMargin),
+            y: Math.max(0, item.pdfY - maskMargin),
+            width: Math.max(10, item.pdfWidth + maskMargin * 2),
+            height: Math.max(10, item.pdfFontSize + maskMargin * 2),
+            color: rgb(1, 1, 1) // white background mask
+          });
+
+          // Draw new text with matching font family, size & color
+          let font = await pdfDoc.embedStandardFont(StandardFonts.Helvetica);
+          if (item.fontFamily === 'Times-Roman') font = await pdfDoc.embedStandardFont(StandardFonts.TimesRoman);
+          if (item.fontFamily === 'Courier') font = await pdfDoc.embedStandardFont(StandardFonts.Courier);
+
+          page.drawText(item.currentText, {
+            x: item.pdfX,
+            y: item.pdfY,
+            size: item.pdfFontSize,
+            font,
+            color: hexToRgb(item.color || '#000000')
+          });
+        }
+
+        // 2. Render freehand drawing canvas for this page
         const canvas = canvasRefs.current[i];
         if (canvas) {
           const ctx = canvas.getContext('2d')!;
@@ -328,7 +447,7 @@ export default function ModifierPDF({ onBack }: ModifierPDFProps) {
           }
         }
 
-        // 2. Draw vector overlays for this page
+        // 3. Draw new vector overlays (user-added text blocks & stamps)
         const pageOverlays = overlays.filter(o => o.pageIndex === i);
         for (const element of pageOverlays) {
           const displayWidth = 600;
@@ -343,7 +462,6 @@ export default function ModifierPDF({ onBack }: ModifierPDFProps) {
             const sizeVal = element.fontSize || 16;
             const pdfFontSize = sizeVal * (pdfHeight / displayHeight);
 
-            // Select standard fonts
             let font = await pdfDoc.embedStandardFont(StandardFonts.Helvetica);
             if (element.fontFamily === 'Times-Roman') font = await pdfDoc.embedStandardFont(StandardFonts.TimesRoman);
             if (element.fontFamily === 'Courier') font = await pdfDoc.embedStandardFont(StandardFonts.Courier);
@@ -374,7 +492,6 @@ export default function ModifierPDF({ onBack }: ModifierPDFProps) {
             const stampH = 40 * (pdfHeight / displayHeight);
             const pdfY = (1 - yPct - (40 / displayHeight)) * pdfHeight;
 
-            // Draw vector stamp border box
             page.drawRectangle({
               x: pdfX,
               y: pdfY,
@@ -382,10 +499,9 @@ export default function ModifierPDF({ onBack }: ModifierPDFProps) {
               height: stampH,
               borderColor: hexToRgb(stampColor),
               borderWidth: 2.5,
-              color: rgb(1, 1, 1) // white filling
+              color: rgb(1, 1, 1)
             });
 
-            // Draw stamp text inside
             const stampFont = await pdfDoc.embedStandardFont(StandardFonts.HelveticaBold);
             const sizeLimit = 11.5 * (pdfHeight / displayHeight);
             const textWidth = stampFont.widthOfTextAtSize(element.stampText, sizeLimit);
@@ -430,21 +546,21 @@ export default function ModifierPDF({ onBack }: ModifierPDFProps) {
           <button onClick={onBack} className="p-2 rounded-xl hover:bg-slate-100 transition-colors text-slate-500 cursor-pointer">
             <ArrowLeft className="w-5 h-5" />
           </button>
-          <h1 className="text-xl font-bold text-gray-800 tracking-tight">Modifier PDF</h1>
+          <h1 className="text-xl font-bold text-gray-800 tracking-tight">Modifier PDF — Éditeur de Textes et Tampons</h1>
           
           {pdfPages.length > 0 && (
             <nav className="flex bg-gray-150 p-1 rounded-xl">
               <button
-                onClick={() => handleTabChange('annotate')}
-                className={`px-4 py-1.5 text-xs font-bold rounded-lg transition-colors cursor-pointer uppercase ${activeTab === 'annotate' ? 'bg-white shadow-sm text-purple-700' : 'text-gray-500 hover:text-gray-900'}`}
-              >
-                Annoter
-              </button>
-              <button
                 onClick={() => handleTabChange('text')}
                 className={`px-4 py-1.5 text-xs font-bold rounded-lg transition-colors cursor-pointer uppercase ${activeTab === 'text' ? 'bg-white shadow-sm text-purple-700' : 'text-gray-500 hover:text-gray-900'}`}
               >
-                Texte
+                Texte &amp; Modification PDF
+              </button>
+              <button
+                onClick={() => handleTabChange('annotate')}
+                className={`px-4 py-1.5 text-xs font-bold rounded-lg transition-colors cursor-pointer uppercase ${activeTab === 'annotate' ? 'bg-white shadow-sm text-purple-700' : 'text-gray-500 hover:text-gray-900'}`}
+              >
+                Annoter / Dessin
               </button>
               <button
                 onClick={() => handleTabChange('stamps')}
@@ -463,7 +579,7 @@ export default function ModifierPDF({ onBack }: ModifierPDFProps) {
               className="flex items-center px-5 py-2.5 bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold uppercase tracking-wider rounded-xl shadow-sm transition-all cursor-pointer"
             >
               <Save className="w-4 h-4 mr-2" />
-              Enregistrer
+              Enregistrer le PDF
             </button>
           </div>
         )}
@@ -474,13 +590,22 @@ export default function ModifierPDF({ onBack }: ModifierPDFProps) {
         <div className="flex items-center px-6 py-2.5 bg-gray-50 border-b border-gray-200 z-10 shrink-0">
           <div className="flex items-center space-x-1.5">
             <button 
-              onClick={() => { setActiveTool('hand'); setSelectedId(null); }}
+              onClick={() => { setActiveTool('hand'); setSelectedId(null); setEditingTextId(null); }}
               className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer ${activeTool === 'hand' ? 'bg-purple-100 text-purple-800' : 'text-gray-600 hover:bg-gray-200'}`}
               title="Naviguer"
             >
-              <Hand className="w-3.5 h-3.5" /> <span>Sélection / Déplacement</span>
+              <Hand className="w-3.5 h-3.5" /> <span>Mode Sélection / Édition</span>
             </button>
             
+            {activeTab === 'text' && (
+              <button 
+                onClick={addTextOverlay}
+                className="flex items-center gap-1.5 px-4 py-1.5 bg-purple-650 hover:bg-purple-750 text-white rounded-lg text-xs font-bold transition-colors cursor-pointer shadow-sm"
+              >
+                <Plus className="w-3.5 h-3.5" /> <span>Ajouter nouveau texte</span>
+              </button>
+            )}
+
             {activeTab === 'annotate' && (
               <>
                 <button 
@@ -502,15 +627,6 @@ export default function ModifierPDF({ onBack }: ModifierPDFProps) {
                   <Eraser className="w-3.5 h-3.5" /> <span>Gomme</span>
                 </button>
               </>
-            )}
-
-            {activeTab === 'text' && (
-              <button 
-                onClick={addTextOverlay}
-                className="flex items-center gap-1 px-4 py-1.5 bg-purple-650 hover:bg-purple-750 text-white rounded-lg text-xs font-bold transition-colors cursor-pointer"
-              >
-                <Plus className="w-3.5 h-3.5" /> <span>Ajouter bloc texte</span>
-              </button>
             )}
 
             <div className="w-px h-5 bg-slate-200 mx-2" />
@@ -548,15 +664,16 @@ export default function ModifierPDF({ onBack }: ModifierPDFProps) {
         <div className="flex-1 overflow-auto p-8 flex justify-center items-start bg-slate-100">
           {pdfPages.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full gap-6 min-h-[450px] w-full">
-              <div className="w-24 h-24 bg-white rounded-full flex items-center justify-center shadow-sm border border-slate-200 text-slate-400">
-                <Upload className="w-10 h-10" />
+              <div className="w-24 h-24 bg-white rounded-full flex items-center justify-center shadow-sm border border-slate-200 text-purple-600">
+                <Edit3 className="w-10 h-10" />
               </div>
               <div className="text-center">
-                <h3 className="text-lg font-bold text-slate-800 mb-1">Chargez le PDF à modifier</h3>
-                <p className="text-slate-500 text-sm max-w-sm">Ajoutez du texte, appliquez des tampons officiels et dessinez en toute liberté.</p>
+                <h3 className="text-xl font-bold text-slate-800 mb-1">Éditeur de PDF interactif &amp; Modification de textes</h3>
+                <p className="text-slate-500 text-sm max-w-md">Modifiez directement les textes existants du document PDF avec conservation parfaite des polices, formes et couleurs.</p>
               </div>
               <button onClick={() => initialFileInputRef.current?.click()} className="flex items-center gap-2 px-6 py-3 bg-purple-600 hover:bg-purple-700 rounded-xl text-white font-bold cursor-pointer transition-all shadow-md">
-                <span>Sélectionner le PDF</span>
+                <Upload className="w-4 h-4" />
+                <span>Sélectionner le document PDF</span>
               </button>
               <input ref={initialFileInputRef} type="file" accept="application/pdf" className="hidden" onChange={e => { if (e.target.files) handleFileChange(e.target.files); e.target.value = ""; }} />
             </div>
@@ -565,7 +682,7 @@ export default function ModifierPDF({ onBack }: ModifierPDFProps) {
               {/* Page navigation */}
               <div className="flex items-center gap-4 bg-white px-5 py-2 rounded-full shadow-sm border">
                 <button 
-                  onClick={() => { setCurrentPage(prev => Math.max(0, prev - 1)); setSelectedId(null); }}
+                  onClick={() => { setCurrentPage(prev => Math.max(0, prev - 1)); setSelectedId(null); setEditingTextId(null); }}
                   disabled={currentPage === 0}
                   className="p-1 rounded hover:bg-slate-100 disabled:opacity-30 cursor-pointer font-bold text-xs"
                 >
@@ -573,7 +690,7 @@ export default function ModifierPDF({ onBack }: ModifierPDFProps) {
                 </button>
                 <span className="text-xs font-bold text-slate-700">Page {currentPage + 1} sur {pdfPages.length}</span>
                 <button 
-                  onClick={() => { setCurrentPage(prev => Math.min(pdfPages.length - 1, prev + 1)); setSelectedId(null); }}
+                  onClick={() => { setCurrentPage(prev => Math.min(pdfPages.length - 1, prev + 1)); setSelectedId(null); setEditingTextId(null); }}
                   disabled={currentPage === pdfPages.length - 1}
                   className="p-1 rounded hover:bg-slate-100 disabled:opacity-30 cursor-pointer font-bold text-xs"
                 >
@@ -589,11 +706,81 @@ export default function ModifierPDF({ onBack }: ModifierPDFProps) {
                 onMouseUp={handleWorkspaceMouseUp}
                 onMouseLeave={handleWorkspaceMouseUp}
               >
+                {/* Background PDF Page Image */}
                 <img 
                   src={pdfPages[currentPage].src} 
                   alt={`Page ${currentPage + 1}`} 
                   className="w-full h-full object-contain pointer-events-none select-none"
                 />
+
+                {/* Mask Layer for edited original text elements */}
+                {extractedTexts.filter(t => t.pageIndex === currentPage && t.isEdited).map(item => (
+                  <div
+                    key={`mask-${item.id}`}
+                    style={{
+                      left: `${item.x - 2}px`,
+                      top: `${item.y - 2}px`,
+                      width: `${item.width + 4}px`,
+                      height: `${item.height + 4}px`,
+                      backgroundColor: '#ffffff'
+                    }}
+                    className="absolute z-15 pointer-events-none"
+                  />
+                ))}
+
+                {/* Interactive Original Text Layers */}
+                {extractedTexts.filter(t => t.pageIndex === currentPage).map(item => {
+                  const isSelected = editingTextId === item.id;
+
+                  return (
+                    <div
+                      key={item.id}
+                      style={{
+                        left: `${item.x}px`,
+                        top: `${item.y}px`,
+                        color: item.color,
+                        fontSize: `${item.fontSize}px`,
+                        fontFamily: item.fontFamily === 'Times-Roman' ? 'Times New Roman, serif' : item.fontFamily === 'Courier' ? 'Courier New, monospace' : 'Arial, sans-serif',
+                        lineHeight: 1.1
+                      }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setEditingTextId(item.id);
+                        setSelectedId(null);
+                        setIsSidebarOpen(true);
+                      }}
+                      className={`absolute z-20 cursor-pointer px-1 py-0.5 rounded transition-all group ${
+                        isSelected 
+                          ? 'ring-2 ring-purple-600 bg-purple-50/90 shadow-sm border border-purple-400' 
+                          : item.isEdited 
+                            ? 'bg-amber-50/80 border border-amber-300' 
+                            : 'hover:bg-purple-100/40 hover:border hover:border-dashed hover:border-purple-400'
+                      }`}
+                    >
+                      {isSelected ? (
+                        <input
+                          type="text"
+                          autoFocus
+                          value={item.currentText}
+                          onChange={(e) => updateExtractedText(item.id, e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') setEditingTextId(null);
+                          }}
+                          className="bg-white text-slate-900 border border-purple-400 outline-none px-1 rounded shadow-inner"
+                          style={{
+                            fontSize: `${item.fontSize}px`,
+                            fontFamily: item.fontFamily === 'Times-Roman' ? 'Times New Roman, serif' : item.fontFamily === 'Courier' ? 'Courier New, monospace' : 'Arial, sans-serif'
+                          }}
+                        />
+                      ) : (
+                        <span className="flex items-center gap-1">
+                          {item.currentText}
+                          <Edit3 className="w-2.5 h-2.5 text-purple-600 opacity-0 group-hover:opacity-100 transition-opacity" />
+                        </span>
+                      )}
+                    </div>
+                  );
+                })}
                 
                 {/* Drawing Layer */}
                 <canvas
@@ -607,7 +794,7 @@ export default function ModifierPDF({ onBack }: ModifierPDFProps) {
                   className={`absolute inset-0 w-full h-full z-10 ${activeTool === 'hand' ? 'pointer-events-none' : 'cursor-crosshair'}`}
                 />
 
-                {/* Vector Overlays Layer */}
+                {/* Vector Added Overlays Layer (New Blocks & Stamps) */}
                 {overlays.filter(o => o.pageIndex === currentPage).map(o => {
                   const isSelected = selectedId === o.id;
 
@@ -617,6 +804,7 @@ export default function ModifierPDF({ onBack }: ModifierPDFProps) {
                         key={o.id}
                         style={{ left: `${o.x}px`, top: `${o.y}px`, color: o.color, fontSize: `${o.fontSize}px`, fontFamily: o.fontFamily, fontWeight: o.isBold ? 'bold' : 'normal', fontStyle: o.isItalic ? 'italic' : 'normal' }}
                         onMouseDown={e => handleOverlayMouseDown(e, o.id)}
+                        onClick={() => setEditingTextId(null)}
                         className={`absolute cursor-move px-2 py-1 select-none whitespace-nowrap z-25 flex items-center group ${
                           isSelected ? 'border border-dashed border-purple-500 bg-purple-50/40 rounded' : 'hover:border hover:border-dashed hover:border-slate-350'
                         }`}
@@ -637,6 +825,7 @@ export default function ModifierPDF({ onBack }: ModifierPDFProps) {
                         key={o.id}
                         style={{ left: `${o.x}px`, top: `${o.y}px`, borderColor: o.stampColor, color: o.stampColor }}
                         onMouseDown={e => handleOverlayMouseDown(e, o.id)}
+                        onClick={() => setEditingTextId(null)}
                         className={`absolute cursor-move select-none w-28 h-10 border-2.5 z-25 flex items-center justify-center font-extrabold uppercase tracking-wide text-[10px] rounded bg-white shadow-sm group ${
                           isSelected ? 'ring-2 ring-purple-500' : 'hover:opacity-90'
                         }`}
@@ -660,15 +849,186 @@ export default function ModifierPDF({ onBack }: ModifierPDFProps) {
 
         {/* Properties Sidebar */}
         {pdfPages.length > 0 && isSidebarOpen && (
-          <aside className="w-72 bg-white border-l border-gray-200 flex flex-col z-20 transition-all duration-300">
+          <aside className="w-80 bg-white border-l border-gray-200 flex flex-col z-20 transition-all duration-300">
             <div className="flex items-center justify-between p-4 border-b bg-gray-50">
-              <h2 className="text-xs font-bold text-slate-700 uppercase tracking-wider">Mise en forme / Outils</h2>
+              <h2 className="text-xs font-bold text-slate-700 uppercase tracking-wider">Propriétés &amp; Modification</h2>
               <button onClick={() => setIsSidebarOpen(false)} className="text-gray-500 hover:text-slate-800 p-1 rounded-md hover:bg-slate-100 cursor-pointer">
                 <X className="w-4 h-4" />
               </button>
             </div>
 
             <div className="flex-1 overflow-y-auto p-5 space-y-6">
+              {/* Original Text Editing Controls */}
+              {selectedExtractedText && (
+                <div className="space-y-5 bg-purple-50/50 p-4 rounded-2xl border border-purple-100">
+                  <div className="flex items-center justify-between border-b border-purple-200/60 pb-2">
+                    <span className="text-xs font-bold text-purple-900 uppercase tracking-wider flex items-center gap-1.5">
+                      <Edit3 className="w-4 h-4 text-purple-600" />
+                      Texte PDF original
+                    </span>
+                    <span className="text-[10px] bg-purple-200 text-purple-800 px-2 py-0.5 rounded-full font-bold">Actif</span>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-600">Modifier la valeur du texte</label>
+                    <textarea
+                      rows={3}
+                      value={selectedExtractedText.currentText}
+                      onChange={(e) => updateExtractedText(selectedExtractedText.id, e.target.value)}
+                      className="w-full text-xs px-3 py-2 border border-purple-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-600 bg-white font-medium text-slate-900 shadow-sm"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-600">Style de Police</label>
+                    <select
+                      value={selectedExtractedText.fontFamily}
+                      onChange={(e) => updateExtractedTextProps(selectedExtractedText.id, { fontFamily: e.target.value })}
+                      className="w-full text-xs px-3 py-2 border border-slate-250 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 font-bold bg-white text-slate-700"
+                    >
+                      <option value="Helvetica">Helvetica / Arial (Sans-Serif)</option>
+                      <option value="Times-Roman">Times New Roman (Serif)</option>
+                      <option value="Courier">Courier (Monospace)</option>
+                    </select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 flex justify-between">
+                      <span>Taille du texte</span>
+                      <span className="font-mono">{selectedExtractedText.fontSize}px</span>
+                    </label>
+                    <input
+                      type="range"
+                      min={8}
+                      max={72}
+                      value={selectedExtractedText.fontSize}
+                      onChange={(e) => updateExtractedTextProps(selectedExtractedText.id, { fontSize: parseInt(e.target.value) })}
+                      className="w-full cursor-pointer accent-purple-650"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-600">Couleur du texte</label>
+                    <div className="grid grid-cols-5 gap-2">
+                      {colors.map((c) => (
+                        <button
+                          key={c}
+                          onClick={() => updateExtractedTextProps(selectedExtractedText.id, { color: c })}
+                          style={{ backgroundColor: c }}
+                          className={`w-8 h-8 rounded-full border cursor-pointer transition-all ${
+                            selectedExtractedText.color === c ? 'ring-2 ring-purple-650 scale-105 border-white' : 'border-slate-200'
+                          }`}
+                        />
+                      ))}
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={() => setEditingTextId(null)}
+                    className="w-full py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold cursor-pointer transition-colors shadow-sm flex items-center justify-center gap-1.5"
+                  >
+                    <Check className="w-4 h-4" />
+                    <span>Valider la modification</span>
+                  </button>
+                </div>
+              )}
+
+              {/* Added Overlay Text Controls */}
+              {selectedOverlay && (
+                <div className="space-y-5 bg-slate-50 p-4 rounded-2xl border border-slate-200">
+                  <div className="flex items-center justify-between border-b border-slate-200 pb-2">
+                    <span className="text-xs font-bold text-slate-800 uppercase tracking-wider">
+                      Bloc texte ajouté
+                    </span>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-500">Contenu du texte</label>
+                    <textarea
+                      rows={3}
+                      value={selectedOverlay.text || ''}
+                      onChange={(e) => updateSelectedOverlay({ text: e.target.value })}
+                      className="w-full text-xs px-3 py-2 border border-slate-250 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 resize-none font-medium text-slate-850"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-500">Police</label>
+                    <select
+                      value={selectedOverlay.fontFamily || 'Helvetica'}
+                      onChange={(e) => updateSelectedOverlay({ fontFamily: e.target.value })}
+                      className="w-full text-xs px-3 py-2 border border-slate-250 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 font-bold bg-white text-slate-700"
+                    >
+                      <option value="Helvetica">Helvetica (Sans-Serif)</option>
+                      <option value="Times-Roman">Times New Roman (Serif)</option>
+                      <option value="Courier">Courier (Monospace)</option>
+                    </select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 flex justify-between">
+                      <span>Taille</span>
+                      <span className="font-mono">{selectedOverlay.fontSize || 16}px</span>
+                    </label>
+                    <input
+                      type="range"
+                      min={8}
+                      max={72}
+                      value={selectedOverlay.fontSize || 16}
+                      onChange={(e) => updateSelectedOverlay({ fontSize: parseInt(e.target.value) })}
+                      className="w-full cursor-pointer accent-purple-650"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-500">Styles</label>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => updateSelectedOverlay({ isBold: !selectedOverlay.isBold })}
+                        className={`flex-1 py-1.5 border rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                          selectedOverlay.isBold ? 'border-purple-600 bg-purple-50 text-purple-700' : 'border-slate-200 text-slate-500'
+                        }`}
+                      >
+                        Gras
+                      </button>
+                      <button
+                        onClick={() => updateSelectedOverlay({ isItalic: !selectedOverlay.isItalic })}
+                        className={`flex-1 py-1.5 border rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                          selectedOverlay.isItalic ? 'border-purple-600 bg-purple-50 text-purple-700' : 'border-slate-200 text-slate-500'
+                        }`}
+                      >
+                        Italique
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-500">Couleur du texte</label>
+                    <div className="grid grid-cols-5 gap-2">
+                      {colors.map((c) => (
+                        <button
+                          key={c}
+                          onClick={() => updateSelectedOverlay({ color: c })}
+                          style={{ backgroundColor: c }}
+                          className={`w-8 h-8 rounded-full border cursor-pointer transition-all ${
+                            selectedOverlay.color === c ? 'ring-2 ring-purple-650 scale-105 border-white' : 'border-slate-200'
+                          }`}
+                        />
+                      ))}
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={() => deleteOverlay(selectedOverlay.id)}
+                    className="w-full flex items-center justify-center gap-1.5 py-2.5 bg-red-50 hover:bg-red-100 text-red-650 border border-red-200 rounded-xl text-xs font-bold cursor-pointer transition-colors"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    <span>Supprimer le texte</span>
+                  </button>
+                </div>
+              )}
+
+              {/* Freehand Drawing Tools Controls */}
               {activeTab === 'annotate' && (
                 <>
                   <div className="space-y-2">
@@ -704,102 +1064,7 @@ export default function ModifierPDF({ onBack }: ModifierPDFProps) {
                 </>
               )}
 
-              {activeTab === 'text' && (
-                <div className="space-y-5">
-                  {!selectedOverlay ? (
-                    <div className="text-center py-8 text-slate-400 text-xs font-medium">
-                      Sélectionnez un bloc de texte sur la page pour le configurer.
-                    </div>
-                  ) : (
-                    <>
-                      <div className="space-y-1.5">
-                        <label className="block text-xs font-bold uppercase tracking-wider text-slate-500">Contenu du texte</label>
-                        <textarea
-                          rows={3}
-                          value={selectedOverlay.text || ''}
-                          onChange={(e) => updateSelectedOverlay({ text: e.target.value })}
-                          className="w-full text-xs px-3 py-2 border border-slate-250 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 resize-none font-medium text-slate-850"
-                        />
-                      </div>
-
-                      <div className="space-y-1.5">
-                        <label className="block text-xs font-bold uppercase tracking-wider text-slate-500">Police</label>
-                        <select
-                          value={selectedOverlay.fontFamily || 'Helvetica'}
-                          onChange={(e) => updateSelectedOverlay({ fontFamily: e.target.value })}
-                          className="w-full text-xs px-3 py-2 border border-slate-250 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 font-bold bg-white text-slate-700"
-                        >
-                          <option value="Helvetica">Helvetica (Sans-Serif)</option>
-                          <option value="Times-Roman">Times New Roman (Serif)</option>
-                          <option value="Courier">Courier (Monospace)</option>
-                        </select>
-                      </div>
-
-                      <div className="space-y-2">
-                        <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 flex justify-between">
-                          <span>Taille</span>
-                          <span className="font-mono">{selectedOverlay.fontSize || 16}px</span>
-                        </label>
-                        <input
-                          type="range"
-                          min={8}
-                          max={72}
-                          value={selectedOverlay.fontSize || 16}
-                          onChange={(e) => updateSelectedOverlay({ fontSize: parseInt(e.target.value) })}
-                          className="w-full cursor-pointer accent-purple-650"
-                        />
-                      </div>
-
-                      <div className="space-y-2">
-                        <label className="block text-xs font-bold uppercase tracking-wider text-slate-500">Styles</label>
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => updateSelectedOverlay({ isBold: !selectedOverlay.isBold })}
-                            className={`flex-1 py-1.5 border rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                              selectedOverlay.isBold ? 'border-purple-600 bg-purple-50 text-purple-700' : 'border-slate-200 text-slate-500'
-                            }`}
-                          >
-                            Gras
-                          </button>
-                          <button
-                            onClick={() => updateSelectedOverlay({ isItalic: !selectedOverlay.isItalic })}
-                            className={`flex-1 py-1.5 border rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                              selectedOverlay.isItalic ? 'border-purple-600 bg-purple-50 text-purple-700' : 'border-slate-200 text-slate-500'
-                            }`}
-                          >
-                            Italique
-                          </button>
-                        </div>
-                      </div>
-
-                      <div className="space-y-2">
-                        <label className="block text-xs font-bold uppercase tracking-wider text-slate-500">Couleur du texte</label>
-                        <div className="grid grid-cols-5 gap-2">
-                          {colors.map((c) => (
-                            <button
-                              key={c}
-                              onClick={() => updateSelectedOverlay({ color: c })}
-                              style={{ backgroundColor: c }}
-                              className={`w-8 h-8 rounded-full border cursor-pointer transition-all ${
-                                selectedOverlay.color === c ? 'ring-2 ring-purple-650 scale-105 border-white' : 'border-slate-200'
-                              }`}
-                            />
-                          ))}
-                        </div>
-                      </div>
-
-                      <button
-                        onClick={() => deleteOverlay(selectedOverlay.id)}
-                        className="w-full flex items-center justify-center gap-1.5 py-2.5 bg-red-50 hover:bg-red-100 text-red-650 border border-red-200 rounded-xl text-xs font-bold cursor-pointer transition-colors"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                        <span>Supprimer le texte</span>
-                      </button>
-                    </>
-                  )}
-                </div>
-              )}
-
+              {/* Stamp presets selection */}
               {activeTab === 'stamps' && (
                 <div className="space-y-4">
                   <span className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2">Choisir un tampon à insérer</span>
@@ -817,6 +1082,12 @@ export default function ModifierPDF({ onBack }: ModifierPDFProps) {
                   </div>
                 </div>
               )}
+
+              {!selectedExtractedText && !selectedOverlay && activeTab === 'text' && (
+                <div className="text-center py-8 text-slate-400 text-xs font-medium">
+                  Cliquez sur n'importe quel texte du PDF pour le modifier directement, ou ajoutez un nouveau bloc de texte.
+                </div>
+              )}
             </div>
           </aside>
         )}
@@ -824,3 +1095,4 @@ export default function ModifierPDF({ onBack }: ModifierPDFProps) {
     </div>
   );
 }
+

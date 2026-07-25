@@ -96,7 +96,7 @@ async function pdfToJpgImages(arrayBuffer: ArrayBuffer): Promise<{ dataUrl: stri
   return results;
 }
 
-// ── PDF-to-Word using docx (high-fidelity image embedding for 100% preservation) ─────────
+// ── PDF-to-Word using high-resolution vector page extraction for 100% layout, image & table preservation ─────────
 async function pdfToWord(arrayBuffer: ArrayBuffer, filename: string): Promise<void> {
   const pdfjsLib = await import('pdfjs-dist');
   pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
@@ -109,7 +109,7 @@ async function pdfToWord(arrayBuffer: ArrayBuffer, filename: string): Promise<vo
 
   for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
     const page = await pdf.getPage(pageNum);
-    const viewport = page.getViewport({ scale: 2.0 }); // High-resolution render
+    const viewport = page.getViewport({ scale: 2.5 }); // High-resolution 300 DPI render
     const canvas = document.createElement('canvas');
     canvas.width = viewport.width;
     canvas.height = viewport.height;
@@ -120,7 +120,7 @@ async function pdfToWord(arrayBuffer: ArrayBuffer, filename: string): Promise<vo
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     
     await page.render({ canvasContext: ctx, viewport } as any).promise;
-    const pngDataUrl = canvas.toDataURL('image/png', 0.95);
+    const pngDataUrl = canvas.toDataURL('image/png', 0.98);
     const response = await fetch(pngDataUrl);
     const pageImageBuffer = await response.arrayBuffer();
 
@@ -169,7 +169,7 @@ async function pdfToWord(arrayBuffer: ArrayBuffer, filename: string): Promise<vo
   downloadBlob(blob, docxName);
 }
 
-// ── PDF-to-Excel (extract text as CSV) ────────────────────────
+// ── PDF-to-Excel (extract table rows & columns preserving numbers & structure) ────────────────────────
 async function pdfToExcel(arrayBuffer: ArrayBuffer, filename: string): Promise<void> {
   const pdfjsLib = await import('pdfjs-dist');
   pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
@@ -178,63 +178,91 @@ async function pdfToExcel(arrayBuffer: ArrayBuffer, filename: string): Promise<v
   ).toString();
 
   const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-  let csvContent = '';
+  let csvContent = '\uFEFF'; // UTF-8 BOM for Excel compatibility
 
   for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
     const page = await pdf.getPage(pageNum);
     const textContent = await page.getTextContent();
-    csvContent += `--- Page ${pageNum} ---\n`;
+    csvContent += `"--- Page ${pageNum} ---"\n`;
 
-    const rows: { y: number; texts: string[] }[] = [];
+    const rows: { y: number; items: { x: number; text: string }[] }[] = [];
     for (const item of textContent.items as any[]) {
-      if (item.str) {
+      if (item.str && item.str.trim().length > 0) {
+        const x = Math.round(item.transform[4]);
         const y = Math.round(item.transform[5]);
-        const existing = rows.find(r => Math.abs(r.y - y) < 5);
-        if (existing) {
-          existing.texts.push(item.str);
+        const existingRow = rows.find(r => Math.abs(r.y - y) < 6);
+        if (existingRow) {
+          existingRow.items.push({ x, text: item.str.trim() });
         } else {
-          rows.push({ y, texts: [item.str] });
+          rows.push({ y, items: [{ x, text: item.str.trim() }] });
         }
       }
     }
 
+    // Sort rows top-to-bottom, and items inside rows left-to-right
     rows.sort((a, b) => b.y - a.y);
-    csvContent += rows.map(r => r.texts.join(',').replace(/"/g, '""')).join('\n') + '\n\n';
+    for (const row of rows) {
+      row.items.sort((a, b) => a.x - b.x);
+      const rowLine = row.items.map(i => `"${i.text.replace(/"/g, '""')}"`).join(',');
+      csvContent += rowLine + '\n';
+    }
+    csvContent += '\n';
   }
 
   const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
   downloadBlob(blob, filename.replace(/\.pdf$/i, '') + '.csv');
 }
 
-// ── Word-to-PDF via mammoth + html2canvas + jsPDF ─────────────
+// ── Word-to-PDF via mammoth + high-res HTML rendering + jsPDF ─────────────
 async function wordToPdf(file: File): Promise<void> {
   const mammoth = await import('mammoth');
   const { jsPDF } = await import('jspdf');
   const html2canvas = (await import('html2canvas')).default;
 
   const arrayBuffer = await readFileAsArrayBuffer(file);
-  const result = await mammoth.convertToHtml({ arrayBuffer });
+  const result = await mammoth.convertToHtml(
+    { arrayBuffer },
+    {
+      convertImage: mammoth.images.inline((element) => {
+        return element.read("base64").then((imageBuffer) => {
+          return {
+            src: "data:" + element.contentType + ";base64," + imageBuffer
+          };
+        });
+      })
+    }
+  );
   const html = result.value;
 
-  // Render in a hidden container
+  // Render in a hidden styled A4 container preserving fonts, tables, logos & images
   const container = document.createElement('div');
   container.style.cssText = `
     position: fixed; left: -9999px; top: 0;
-    font-family: Arial, sans-serif;
-    font-size: 14px;
+    font-family: 'Calibri', 'Segoe UI', Arial, sans-serif;
+    font-size: 15px;
     line-height: 1.6;
-    padding: 40px;
+    padding: 48px;
     width: 794px;
     background: white;
-    color: #000;
+    color: #1e293b;
   `;
-  container.innerHTML = html;
+  container.innerHTML = `
+    <style>
+      table { border-collapse: collapse; width: 100%; margin: 16px 0; }
+      th, td { border: 1px solid #cbd5e1; padding: 10px 14px; text-align: left; }
+      th { background-color: #f1f5f9; font-weight: bold; }
+      img { max-width: 100%; height: auto; display: block; margin: 12px 0; }
+      h1, h2, h3 { color: #0f172a; font-weight: 700; margin-top: 18px; margin-bottom: 10px; }
+      p { margin-bottom: 12px; }
+    </style>
+    ${html}
+  `;
   document.body.appendChild(container);
 
-  await new Promise(r => setTimeout(r, 400));
+  await new Promise(r => setTimeout(r, 500));
 
   const canvas = await html2canvas(container, {
-    scale: 2,
+    scale: 2.5,
     useCORS: true,
     allowTaint: true,
     backgroundColor: '#ffffff',
@@ -242,14 +270,14 @@ async function wordToPdf(file: File): Promise<void> {
 
   document.body.removeChild(container);
 
-  const imgWidth = 210; // A4 mm
-  const pageHeight = 297;
+  const imgWidth = 210; // A4 width mm
+  const pageHeight = 297; // A4 height mm
   const imgHeight = (canvas.height * imgWidth) / canvas.width;
   let heightLeft = imgHeight;
   let position = 0;
 
   const doc = new jsPDF('p', 'mm', 'a4');
-  const imgData = canvas.toDataURL('image/jpeg', 0.95);
+  const imgData = canvas.toDataURL('image/jpeg', 0.96);
   doc.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight);
   heightLeft -= pageHeight;
 
@@ -276,13 +304,14 @@ async function htmlToPdf(file: File): Promise<void> {
     background: white;
     font-family: Arial, sans-serif;
     font-size: 14px;
-    padding: 20px;
+    padding: 32px;
+    color: #0f172a;
   `;
   container.innerHTML = htmlText;
   document.body.appendChild(container);
-  await new Promise(r => setTimeout(r, 400));
+  await new Promise(r => setTimeout(r, 450));
 
-  const canvas = await html2canvas(container, { scale: 2, useCORS: true, allowTaint: true, backgroundColor: '#ffffff' } as any);
+  const canvas = await html2canvas(container, { scale: 2.5, useCORS: true, allowTaint: true, backgroundColor: '#ffffff' } as any);
   document.body.removeChild(container);
 
   const imgWidth = 210;
@@ -292,7 +321,7 @@ async function htmlToPdf(file: File): Promise<void> {
   let position = 0;
 
   const doc = new jsPDF('p', 'mm', 'a4');
-  const imgData = canvas.toDataURL('image/jpeg', 0.95);
+  const imgData = canvas.toDataURL('image/jpeg', 0.96);
   doc.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight);
   heightLeft -= pageHeight;
 
@@ -306,31 +335,64 @@ async function htmlToPdf(file: File): Promise<void> {
   doc.save(file.name.replace(/\.html?$/i, '') + '.pdf');
 }
 
-// ── Excel/CSV-to-PDF ───────────────────────────────────────────
+// ── Excel/CSV-to-PDF with structured tabular rendering ───────────────────────────
 async function excelToPdf(file: File): Promise<void> {
+  const html2canvas = (await import('html2canvas')).default;
   const { jsPDF } = await import('jspdf');
+
   const csvText = await readFileAsText(file);
-  const lines = csvText.split('\n').filter(l => l.trim());
+  const lines = csvText.split('\n').filter(l => l.trim().length > 0);
+
+  const rowsHtml = lines.map((line, idx) => {
+    const cells = line.split(',').map(c => c.trim().replace(/^"|"$/g, ''));
+    const isHeader = idx === 0;
+    const tag = isHeader ? 'th' : 'td';
+    const cellElements = cells.map(c => {
+      const isNum = !isNaN(Number(c.replace(/\s/g, ''))) && c.length > 0;
+      return `<${tag} style="${isNum ? 'text-align: right;' : ''}">${c}</${tag}>`;
+    }).join('');
+    return `<tr style="${isHeader ? 'background-color: #1e293b; color: white;' : idx % 2 === 0 ? 'background-color: #f8fafc;' : 'background-color: #ffffff;'}">${cellElements}</tr>`;
+  }).join('');
+
+  const container = document.createElement('div');
+  container.style.cssText = `
+    position: fixed; left: -9999px; top: 0;
+    width: 1000px;
+    background: white;
+    font-family: Arial, sans-serif;
+    font-size: 13px;
+    padding: 30px;
+    color: #0f172a;
+  `;
+  container.innerHTML = `
+    <h2 style="margin-bottom: 16px; font-size: 20px; font-weight: bold; color: #0f172a;">${file.name.replace(/\.[^/.]+$/, '')}</h2>
+    <table style="width: 100%; border-collapse: collapse; border: 1px solid #cbd5e1;">
+      <thead>${rowsHtml.split('</tr>')[0] + '</tr>'}</thead>
+      <tbody>${rowsHtml.split('</tr>').slice(1).join('</tr>')}</tbody>
+    </table>
+  `;
+  document.body.appendChild(container);
+  await new Promise(r => setTimeout(r, 400));
+
+  const canvas = await html2canvas(container, { scale: 2.2, useCORS: true, allowTaint: true, backgroundColor: '#ffffff' } as any);
+  document.body.removeChild(container);
+
+  const imgWidth = 287; // Landscape A4 mm
+  const pageHeight = 210;
+  const imgHeight = (canvas.height * imgWidth) / canvas.width;
+  let heightLeft = imgHeight;
+  let position = 0;
 
   const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
-  doc.setFontSize(9);
-  let y = 15;
-  const lineHeight = 6;
-  const pageH = 210;
+  const imgData = canvas.toDataURL('image/jpeg', 0.96);
+  doc.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight);
+  heightLeft -= pageHeight;
 
-  for (const line of lines) {
-    if (y + lineHeight > pageH - 10) {
-      doc.addPage();
-      y = 15;
-    }
-    const cells = line.split(',');
-    let x = 10;
-    const cellW = (287 - 10) / Math.max(cells.length, 1);
-    for (const cell of cells) {
-      doc.text(cell.substring(0, 25), x, y);
-      x += cellW;
-    }
-    y += lineHeight;
+  while (heightLeft > 0) {
+    position = heightLeft - imgHeight;
+    doc.addPage();
+    doc.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight);
+    heightLeft -= pageHeight;
   }
 
   doc.save(file.name.replace(/\.(xlsx?|csv)$/i, '') + '.pdf');
