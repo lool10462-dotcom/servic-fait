@@ -14,7 +14,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return;
   }
 
-  const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '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';
+  const GEMINI_API_KEY = process.env.GEMINI_API_KEY || process.env.NVIDIA_API_KEY || '';
   const isNvidiaKey = GEMINI_API_KEY.startsWith('nvapi-');
 
   // NVIDIA NIM Engine
@@ -93,7 +93,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const prompt = `Notes brutes du technicien: "${rawNotes}"\nÉquipement concerné: ${deviceType || 'PC'} (Marque: ${deviceBrand || 'Standard'})\nBénéficiaire: ${clientName || 'Collaborateur'} (${clientTitle || 'Fonctionnaire'})\nSecteur/Département: ${clientDepartment || 'Dossier Technique'}\n\nFormulez ceci de manière extrêmement professionnelle en insérant intelligemment et formellement ces informations dans un style d'attestation administrative officielle d'État de style République de Djibouti.`;
 
       const response = await ai.models.generateContent({
-        model: 'gemini-3.5-flash',
+        model: 'gemini-2.5-flash',
         contents: prompt,
         config: {
           systemInstruction:

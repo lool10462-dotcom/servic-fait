@@ -8,16 +8,18 @@ import path from "path";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI, Type } from "@google/genai";
 import dotenv from "dotenv";
+import studioAiHandler from "./api/studio-ai";
 
 dotenv.config();
 
 const app = express();
 const PORT = 3000;
 
-app.use(express.json());
+app.use(express.json({ limit: "50mb" }));
+app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
 // Initialize Google GenAI or Nvidia LLM API keys
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY || "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";
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY || process.env.NVIDIA_API_KEY || "";
 
 let ai: GoogleGenAI | null = null;
 const isNvidiaKey = GEMINI_API_KEY.startsWith("nvapi-");
@@ -110,7 +112,7 @@ app.post("/api/refine-tasks", async (req: Request, res: Response): Promise<void>
       const prompt = `Notes brutes du technicien: "${rawNotes}"\nÉquipement concerné: ${deviceType || 'PC'} (Marque: ${deviceBrand || 'Standard'})\nBénéficiaire: ${clientName || 'Collaborateur'} (${clientTitle || 'Fonctionnaire'})\nSecteur/Département: ${clientDepartment || 'Dossier Technique'}\n\nFormulez ceci de manière extrêmement professionnelle en insérant intelligemment et formellement ces informations dans un style d'attestation administrative officielle d'État de style République de Djibouti.`;
 
       const response = await ai.models.generateContent({
-        model: "gemini-3.5-flash",
+        model: "gemini-2.5-flash",
         contents: prompt,
         config: {
           systemInstruction: 
@@ -317,7 +319,7 @@ app.post("/api/parse-voice", async (req: Request, res: Response): Promise<void> 
     try {
       console.log("[CNIPLC API Voice] Using Gemini AI Engine...");
       const response = await ai.models.generateContent({
-        model: "gemini-3.5-flash",
+        model: "gemini-2.5-flash",
         contents: `Analysez cette transcription audio d'intervention : "${transcript}" et transformez la en objet JSON structuré.`,
         config: {
           systemInstruction: 
@@ -412,6 +414,11 @@ app.post("/api/parse-voice", async (req: Request, res: Response): Promise<void> 
       { description: "Mise à niveau et contrôle de la mémoire vive (RAM)", category: "Matériel" }
     ]
   });
+});
+
+// PDF & Image Studio AI Endpoint (Translation, Natural Commands, OCR & Vision Analysis)
+app.post("/api/studio-ai", async (req: Request, res: Response): Promise<void> => {
+  await studioAiHandler(req as any, res as any);
 });
 
 // Start server

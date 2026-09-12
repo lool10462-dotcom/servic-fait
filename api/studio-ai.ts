@@ -7,7 +7,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   const { actionType, command, text, layers } = req.body;
-  const GEMINI_API_KEY = process.env.GEMINI_API_KEY || "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";
+  const GEMINI_API_KEY = process.env.GEMINI_API_KEY || process.env.NVIDIA_API_KEY || "";
   const isNvidiaKey = GEMINI_API_KEY.startsWith("nvapi-");
 
   if (actionType === "translate") {
@@ -54,7 +54,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const { GoogleGenAI } = await import('@google/genai');
       const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
       const response = await ai.models.generateContent({
-        model: "gemini-3.5-flash",
+        model: "gemini-2.5-flash",
         contents: `Translate the following text into English, keeping the original tone, speech bubble style, and punctuation intact. Only return the translated text without quotes or explanations:\n\n"${text}"`,
       });
       res.json({ translatedText: response.text?.trim() });
@@ -147,7 +147,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       Retournez uniquement cet objet JSON strict.`;
 
       const response = await ai.models.generateContent({
-        model: "gemini-3.5-flash",
+        model: "gemini-2.5-flash",
         contents: prompt,
         config: {
           responseMimeType: "application/json",

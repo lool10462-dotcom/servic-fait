@@ -69,7 +69,7 @@ export async function generateWordBlob(
   const logoBuffer = await fetchLogoAsArrayBuffer();
 
   // Build header children
-  const headerChildren: Paragraph[] = [];
+  const headerChildren: (Paragraph | Table)[] = [];
 
   // Logo + Republic header
   if (logoBuffer) {

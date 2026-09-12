@@ -14,7 +14,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return;
   }
 
-  const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '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';
+  const GEMINI_API_KEY = process.env.GEMINI_API_KEY || process.env.NVIDIA_API_KEY || '';
   const isNvidiaKey = GEMINI_API_KEY.startsWith('nvapi-');
   const currentDateStr = new Date().toISOString().substring(0, 10);
 
@@ -93,7 +93,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       });
 
       const response = await ai.models.generateContent({
-        model: 'gemini-3.5-flash',
+        model: 'gemini-2.5-flash',
         contents: `Analysez cette transcription audio d'intervention : "${transcript}" et transformez la en objet JSON structuré.`,
         config: {
           systemInstruction:

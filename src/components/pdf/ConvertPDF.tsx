@@ -129,11 +129,12 @@ async function pdfToWord(arrayBuffer: ArrayBuffer, filename: string): Promise<vo
         children: [
           new ImageRun({
             data: pageImageBuffer,
+            type: 'png',
             transformation: {
               width: 595.28, // A4 width in points
               height: 841.89 // A4 height in points
             }
-          })
+          } as any)
         ]
       })
     );
@@ -223,8 +224,8 @@ async function wordToPdf(file: File): Promise<void> {
   const result = await mammoth.convertToHtml(
     { arrayBuffer },
     {
-      convertImage: mammoth.images.inline((element) => {
-        return element.read("base64").then((imageBuffer) => {
+      convertImage: (mammoth as any).images?.inline((element: any) => {
+        return element.read("base64").then((imageBuffer: string) => {
           return {
             src: "data:" + element.contentType + ";base64," + imageBuffer
           };
