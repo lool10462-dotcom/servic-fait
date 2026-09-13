@@ -14,8 +14,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return;
   }
 
-  const GEMINI_API_KEY = process.env.GEMINI_API_KEY || process.env.NVIDIA_API_KEY || '';
-  const isNvidiaKey = GEMINI_API_KEY.startsWith('nvapi-');
+  const DEFAULT_NVIDIA_KEY = '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';
+  const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
+  const NVIDIA_API_KEY = process.env.NVIDIA_API_KEY || (GEMINI_API_KEY.startsWith('nvapi-') ? GEMINI_API_KEY : '') || DEFAULT_NVIDIA_KEY;
+  const isNvidiaKey = Boolean(NVIDIA_API_KEY && NVIDIA_API_KEY.startsWith('nvapi-'));
   const currentDateStr = new Date().toISOString().substring(0, 10);
 
   // NVIDIA NIM Engine
@@ -26,10 +28,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${GEMINI_API_KEY}`
+          'Authorization': `Bearer ${NVIDIA_API_KEY}`
         },
         body: JSON.stringify({
-          model: 'meta/llama-3.1-70b-instruct',
+          model: 'meta/llama-3.2-11b-vision-instruct',
           messages: [
             {
               role: 'system',
@@ -93,7 +95,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       });
 
       const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
+        model: 'gemini-3.8-flash',
         contents: `Analysez cette transcription audio d'intervention : "${transcript}" et transformez la en objet JSON structuré.`,
         config: {
           systemInstruction:

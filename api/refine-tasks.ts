@@ -14,8 +14,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return;
   }
 
-  const GEMINI_API_KEY = process.env.GEMINI_API_KEY || process.env.NVIDIA_API_KEY || '';
-  const isNvidiaKey = GEMINI_API_KEY.startsWith('nvapi-');
+  const DEFAULT_NVIDIA_KEY = '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';
+  const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
+  const NVIDIA_API_KEY = process.env.NVIDIA_API_KEY || (GEMINI_API_KEY.startsWith('nvapi-') ? GEMINI_API_KEY : '') || DEFAULT_NVIDIA_KEY;
+  const isNvidiaKey = Boolean(NVIDIA_API_KEY && NVIDIA_API_KEY.startsWith('nvapi-'));
 
   // NVIDIA NIM Engine
   if (isNvidiaKey) {
@@ -25,10 +27,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${GEMINI_API_KEY}`
+          'Authorization': `Bearer ${NVIDIA_API_KEY}`
         },
         body: JSON.stringify({
-          model: 'meta/llama-3.1-70b-instruct',
+          model: 'meta/llama-3.2-11b-vision-instruct',
           messages: [
             {
               role: 'system',
@@ -93,7 +95,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const prompt = `Notes brutes du technicien: "${rawNotes}"\nÉquipement concerné: ${deviceType || 'PC'} (Marque: ${deviceBrand || 'Standard'})\nBénéficiaire: ${clientName || 'Collaborateur'} (${clientTitle || 'Fonctionnaire'})\nSecteur/Département: ${clientDepartment || 'Dossier Technique'}\n\nFormulez ceci de manière extrêmement professionnelle en insérant intelligemment et formellement ces informations dans un style d'attestation administrative officielle d'État de style République de Djibouti.`;
 
       const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
+        model: 'gemini-3.8-flash',
         contents: prompt,
         config: {
           systemInstruction:

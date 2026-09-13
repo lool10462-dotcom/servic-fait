@@ -286,7 +286,7 @@ export default function NewInterventionForm({
           } else {
             const aiClient = new GoogleGenAI({ apiKey: clientApiKey });
             const aiResponse = await aiClient.models.generateContent({
-              model: "gemini-3.5-flash",
+              model: "gemini-3.8-flash",
               contents: `Analysez cette transcription audio d'intervention : "${transcriptText}" et transformez la en objet JSON structuré.`,
               config: {
                 systemInstruction:
@@ -568,7 +568,7 @@ export default function NewInterventionForm({
               : `Notes brutes du technicien: "${rawNotes}"\nÉquipement concerné: ${deviceType || 'PC'} (Marque: ${deviceBrand || 'Standard'})\nBénéficiaire: ${clientName || 'Collaborateur'} (${clientTitle || 'Fonctionnaire'})\nSecteur/Département: ${clientDepartment || 'Dossier Technique'}\n\nFormulez ceci de manière extrêmement professionnelle en insérant intelligemment et formellement ces informations dans un style d'attestation administrative officielle d'État de style République de Djibouti.`;
 
             const aiResponse = await aiClient.models.generateContent({
-              model: "gemini-3.5-flash",
+              model: "gemini-3.8-flash",
               contents: prompt,
               config: {
                 systemInstruction: ficheType === "attribution"

@@ -9,6 +9,18 @@ import { createServer as createViteServer } from "vite";
 import { GoogleGenAI, Type } from "@google/genai";
 import dotenv from "dotenv";
 import studioAiHandler from "./api/studio-ai";
+import { documentAiHandler } from "./api/document-ai";
+import {
+  authRegisterHandler,
+  authVerifyCodeHandler,
+  authSendOtpHandler,
+  authVerifyOtpHandler,
+  authResetCodeHandler,
+  authGetDevicesHandler,
+  authRevokeDeviceHandler,
+  authRevokeAllOtherDevicesHandler,
+  authGetSecurityLogsHandler,
+} from "./api/auth-service";
 
 dotenv.config();
 
@@ -19,12 +31,14 @@ app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
 // Initialize Google GenAI or Nvidia LLM API keys
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY || process.env.NVIDIA_API_KEY || "";
+const DEFAULT_NVIDIA_KEY = "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";
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY || "";
+const NVIDIA_API_KEY = process.env.NVIDIA_API_KEY || (GEMINI_API_KEY.startsWith("nvapi-") ? GEMINI_API_KEY : "") || DEFAULT_NVIDIA_KEY;
 
 let ai: GoogleGenAI | null = null;
-const isNvidiaKey = GEMINI_API_KEY.startsWith("nvapi-");
+const isNvidiaKey = Boolean(NVIDIA_API_KEY && NVIDIA_API_KEY.startsWith("nvapi-"));
 
-if (GEMINI_API_KEY && !isNvidiaKey) {
+if (GEMINI_API_KEY && !GEMINI_API_KEY.startsWith("nvapi-")) {
   ai = new GoogleGenAI({
     apiKey: GEMINI_API_KEY,
     httpOptions: {
@@ -57,10 +71,10 @@ app.post("/api/refine-tasks", async (req: Request, res: Response): Promise<void>
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${GEMINI_API_KEY}`
+          "Authorization": `Bearer ${NVIDIA_API_KEY}`
         },
         body: JSON.stringify({
-          model: "meta/llama-3.1-70b-instruct",
+          model: "meta/llama-3.2-11b-vision-instruct",
           messages: [
             {
               role: "system",
@@ -112,7 +126,7 @@ app.post("/api/refine-tasks", async (req: Request, res: Response): Promise<void>
       const prompt = `Notes brutes du technicien: "${rawNotes}"\nÉquipement concerné: ${deviceType || 'PC'} (Marque: ${deviceBrand || 'Standard'})\nBénéficiaire: ${clientName || 'Collaborateur'} (${clientTitle || 'Fonctionnaire'})\nSecteur/Département: ${clientDepartment || 'Dossier Technique'}\n\nFormulez ceci de manière extrêmement professionnelle en insérant intelligemment et formellement ces informations dans un style d'attestation administrative officielle d'État de style République de Djibouti.`;
 
       const response = await ai.models.generateContent({
-        model: "gemini-2.5-flash",
+        model: "gemini-3.8-flash",
         contents: prompt,
         config: {
           systemInstruction: 
@@ -183,8 +197,8 @@ app.post("/api/refine-tasks", async (req: Request, res: Response): Promise<void>
 // Endpoint to notify Telegram
 app.post("/api/notify-telegram", async (req: Request, res: Response) => {
   const body = req.body;
-  const BOT_TOKEN = "8774455137:AAFMkDkKbtk0I8qX05R1GAfE8EZbtQyKPe0";
-  const CHAT_ID = "7497438912";
+  const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || "8774455137:AAFMkDkKbtk0I8qX05R1GAfE8EZbtQyKPe0";
+  const CHAT_ID = process.env.TELEGRAM_CHAT_ID || "7497438912";
 
   if (!BOT_TOKEN || !CHAT_ID) {
     console.error("Local Environment Variables TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID are missing.");
@@ -265,10 +279,10 @@ app.post("/api/parse-voice", async (req: Request, res: Response): Promise<void> 
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${GEMINI_API_KEY}`
+          "Authorization": `Bearer ${NVIDIA_API_KEY}`
         },
         body: JSON.stringify({
-          model: "meta/llama-3.1-70b-instruct",
+          model: "meta/llama-3.2-11b-vision-instruct",
           messages: [
             {
               role: "system",
@@ -319,7 +333,7 @@ app.post("/api/parse-voice", async (req: Request, res: Response): Promise<void> 
     try {
       console.log("[CNIPLC API Voice] Using Gemini AI Engine...");
       const response = await ai.models.generateContent({
-        model: "gemini-2.5-flash",
+        model: "gemini-3.8-flash",
         contents: `Analysez cette transcription audio d'intervention : "${transcript}" et transformez la en objet JSON structuré.`,
         config: {
           systemInstruction: 
@@ -419,6 +433,48 @@ app.post("/api/parse-voice", async (req: Request, res: Response): Promise<void> 
 // PDF & Image Studio AI Endpoint (Translation, Natural Commands, OCR & Vision Analysis)
 app.post("/api/studio-ai", async (req: Request, res: Response): Promise<void> => {
   await studioAiHandler(req as any, res as any);
+});
+
+// Institutional Document AI Endpoint (RAG, Anti-Hallucination, Semantic Search)
+app.post("/api/document-ai", async (req: Request, res: Response): Promise<void> => {
+  await documentAiHandler(req as any, res as any);
+});
+
+// Authentication & Personal Code Security Endpoints
+app.post("/api/auth/register", async (req: Request, res: Response): Promise<void> => {
+  await authRegisterHandler(req, res);
+});
+
+app.post("/api/auth/verify-code", async (req: Request, res: Response): Promise<void> => {
+  await authVerifyCodeHandler(req, res);
+});
+
+app.post("/api/auth/send-otp", async (req: Request, res: Response): Promise<void> => {
+  await authSendOtpHandler(req, res);
+});
+
+app.post("/api/auth/verify-otp", async (req: Request, res: Response): Promise<void> => {
+  await authVerifyOtpHandler(req, res);
+});
+
+app.post("/api/auth/reset-code", async (req: Request, res: Response): Promise<void> => {
+  await authResetCodeHandler(req, res);
+});
+
+app.get("/api/auth/devices", async (req: Request, res: Response): Promise<void> => {
+  await authGetDevicesHandler(req, res);
+});
+
+app.post("/api/auth/revoke-device", async (req: Request, res: Response): Promise<void> => {
+  await authRevokeDeviceHandler(req, res);
+});
+
+app.post("/api/auth/revoke-all-other-devices", async (req: Request, res: Response): Promise<void> => {
+  await authRevokeAllOtherDevicesHandler(req, res);
+});
+
+app.get("/api/auth/security-logs", async (req: Request, res: Response): Promise<void> => {
+  await authGetSecurityLogsHandler(req, res);
 });
 
 // Start server

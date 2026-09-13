@@ -15,8 +15,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   const body = req.body;
-  const BOT_TOKEN = "8774455137:AAFMkDkKbtk0I8qX05R1GAfE8EZbtQyKPe0";
-  const CHAT_ID = "7497438912";
+  const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || "8774455137:AAFMkDkKbtk0I8qX05R1GAfE8EZbtQyKPe0";
+  const CHAT_ID = process.env.TELEGRAM_CHAT_ID || "7497438912";
 
   const emojiType: Record<string, string> = {
     bug: "🐛",

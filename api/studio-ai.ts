@@ -7,8 +7,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   const { actionType, command, text, layers } = req.body;
-  const GEMINI_API_KEY = process.env.GEMINI_API_KEY || process.env.NVIDIA_API_KEY || "";
-  const isNvidiaKey = GEMINI_API_KEY.startsWith("nvapi-");
+  const DEFAULT_NVIDIA_KEY = "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";
+  const GEMINI_API_KEY = process.env.GEMINI_API_KEY || "";
+  const NVIDIA_API_KEY = process.env.NVIDIA_API_KEY || (GEMINI_API_KEY.startsWith("nvapi-") ? GEMINI_API_KEY : "") || DEFAULT_NVIDIA_KEY;
+  const isNvidiaKey = Boolean(NVIDIA_API_KEY && NVIDIA_API_KEY.startsWith("nvapi-"));
 
   if (actionType === "translate") {
     if (!text || typeof text !== "string") {
@@ -23,10 +25,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            "Authorization": `Bearer ${GEMINI_API_KEY}`
+            "Authorization": `Bearer ${NVIDIA_API_KEY}`
           },
           body: JSON.stringify({
-            model: "meta/llama-3.1-70b-instruct",
+            model: "meta/llama-3.2-11b-vision-instruct",
             messages: [
               { role: "system", content: "You are a professional translator. Translate the given text to English. Keep the original tone, speech bubble style, and punctuation intact. Only return the translated text without quotes or explanations." },
               { role: "user", content: text }
@@ -52,9 +54,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Gemini fallback inside serverless
     try {
       const { GoogleGenAI } = await import('@google/genai');
-      const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
+      const ai = new GoogleGenAI({
+        apiKey: GEMINI_API_KEY,
+        httpOptions: { headers: { 'User-Agent': 'aistudio-build' } }
+      });
       const response = await ai.models.generateContent({
-        model: "gemini-2.5-flash",
+        model: "gemini-3.8-flash",
         contents: `Translate the following text into English, keeping the original tone, speech bubble style, and punctuation intact. Only return the translated text without quotes or explanations:\n\n"${text}"`,
       });
       res.json({ translatedText: response.text?.trim() });
@@ -80,10 +85,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            "Authorization": `Bearer ${GEMINI_API_KEY}`
+            "Authorization": `Bearer ${NVIDIA_API_KEY}`
           },
           body: JSON.stringify({
-            model: "meta/llama-3.1-70b-instruct",
+            model: "meta/llama-3.2-11b-vision-instruct",
             messages: [
               {
                 role: "system",
@@ -147,7 +152,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       Retournez uniquement cet objet JSON strict.`;
 
       const response = await ai.models.generateContent({
-        model: "gemini-2.5-flash",
+        model: "gemini-3.8-flash",
         contents: prompt,
         config: {
           responseMimeType: "application/json",
@@ -267,7 +272,7 @@ Return a strict JSON object with this format, do not include markdown backticks:
               method: "POST",
               headers: {
                 "Content-Type": "application/json",
-                "Authorization": `Bearer ${GEMINI_API_KEY}`
+                "Authorization": `Bearer ${NVIDIA_API_KEY}`
               },
               body: JSON.stringify({
                 model: "meta/llama-3.2-11b-vision-instruct",
@@ -305,11 +310,14 @@ Return a strict JSON object with this format, do not include markdown backticks:
         // Gemini fallback for vision
         if (!parsedResult) {
           try {
-            console.log("[Studio AI Serverless] OCR: Querying Gemini 2.5 Flash Vision...");
+            console.log("[Studio AI Serverless] OCR: Querying Gemini 3.8 Flash Vision...");
             const { GoogleGenAI, Type } = await import('@google/genai');
-            const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
+            const ai = new GoogleGenAI({
+              apiKey: GEMINI_API_KEY,
+              httpOptions: { headers: { 'User-Agent': 'aistudio-build' } }
+            });
             const response = await ai.models.generateContent({
-              model: "gemini-2.5-flash",
+              model: "gemini-3.8-flash",
               contents: [
                 {
                   inlineData: {
@@ -529,7 +537,7 @@ RULES:
               method: "POST",
               headers: {
                 "Content-Type": "application/json",
-                "Authorization": `Bearer ${GEMINI_API_KEY}`
+                "Authorization": `Bearer ${NVIDIA_API_KEY}`
               },
               body: JSON.stringify({
                 model: "meta/llama-3.2-11b-vision-instruct",
@@ -567,14 +575,17 @@ RULES:
           }
         }
 
-        // === Gemini 2.5 Flash Vision (fallback) ===
+        // === Gemini 3.8 Flash Vision (fallback) ===
         if (!analysisResult) {
           try {
-            console.log("[Studio AI Serverless] full-analysis: Querying Gemini 2.5 Flash Vision...");
+            console.log("[Studio AI Serverless] full-analysis: Querying Gemini 3.8 Flash Vision...");
             const { GoogleGenAI } = await import('@google/genai');
-            const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
+            const ai = new GoogleGenAI({
+              apiKey: GEMINI_API_KEY,
+              httpOptions: { headers: { 'User-Agent': 'aistudio-build' } }
+            });
             const response = await ai.models.generateContent({
-              model: "gemini-2.5-flash",
+              model: "gemini-3.8-flash",
               contents: [
                 {
                   inlineData: {

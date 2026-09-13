@@ -1,8 +1,8 @@
 import { createClient } from '@supabase/supabase-js';
 import { Intervention, TechProfile } from '../types';
 
-const supabaseUrl = 'https://pzfcjxjydgopeloxlacg.supabase.co';
-const supabaseKey = 'sb_publishable_GWF5fDuA42RGLsNFCB63kg_S_B89gK7';
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://pzfcjxjydgopeloxlacg.supabase.co';
+const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'sb_publishable_GWF5fDuA42RGLsNFCB63kg_S_B89gK7';
 
 export const supabase = createClient(supabaseUrl, supabaseKey);
 

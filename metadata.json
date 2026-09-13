@@ -1,6 +1,6 @@
 {
   "name": "Registre des Interventions IT",
-  "description": "Application professionnelle de registre et de génération d'attestations de service fait pour les interventions informatiques au CNIPLC.",
+  "description": "Plateforme institutionnelle CNIPLC : Intelligence documentaire et RAG, registre de signalement IT, attestations de service fait et portail OfficeLink.",
   "requestFramePermissions": ["microphone"],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }
