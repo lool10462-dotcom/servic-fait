@@ -58,6 +58,7 @@ interface DocPlatformFileManagerProps {
   onDeleteDocument: (docId: string) => void;
   onUpdateDocument?: (doc: InstitutionDocument) => void;
   onSelectDocument: (doc: InstitutionDocument) => void;
+  onPurgeDemoDocs?: () => void;
 }
 
 export default function DocPlatformFileManager({
@@ -66,7 +67,8 @@ export default function DocPlatformFileManager({
   onAddMultipleDocuments,
   onDeleteDocument,
   onUpdateDocument,
-  onSelectDocument
+  onSelectDocument,
+  onPurgeDemoDocs
 }: DocPlatformFileManagerProps) {
   const { user } = useAuth();
   const currentUserId = user?.id || '550e8400-e29b-41d4-a716-446655440000';
@@ -551,6 +553,7 @@ export default function DocPlatformFileManager({
             onAddMultipleDocuments={onAddMultipleDocuments || ((docs) => docs.forEach(onAddDocument))}
             onAddDocument={onAddDocument}
             existingDocumentsCount={documents.length}
+            onPurgeDemoDocs={onPurgeDemoDocs}
           />
         </div>
       )}

@@ -32,6 +32,7 @@ interface DocPlatformDashboardProps {
   onTriggerUpload: () => void;
   onAddDocument: (doc: InstitutionDocument) => void;
   onAddMultipleDocuments: (docs: InstitutionDocument[]) => void;
+  onPurgeDemoDocs?: () => void;
 }
 
 export default function DocPlatformDashboard({
@@ -41,7 +42,8 @@ export default function DocPlatformDashboard({
   onAskAiPrompt,
   onTriggerUpload,
   onAddDocument,
-  onAddMultipleDocuments
+  onAddMultipleDocuments,
+  onPurgeDemoDocs
 }: DocPlatformDashboardProps) {
   const [isQuickAccessOpen, setIsQuickAccessOpen] = useState(true);
 
@@ -152,6 +154,7 @@ export default function DocPlatformDashboard({
           onAddMultipleDocuments={onAddMultipleDocuments}
           onAddDocument={onAddDocument}
           existingDocumentsCount={documents.length}
+          onPurgeDemoDocs={onPurgeDemoDocs}
         />
       </div>
 

@@ -198,6 +198,19 @@ export default function InstitutionAiPlatformPage() {
     saveUserAuditLogs(user.id, updated);
   };
 
+  const handlePurgeDemoDocs = () => {
+    if (!user) return;
+    // Retain only authentic local/synced user files, remove static pre-seeded mock templates
+    const realUserDocs = documents.filter(d => d.isLocalSynced || d.id.startsWith('doc-real-') || d.tags?.includes('Dossier Local Réel'));
+    setDocuments(realUserDocs);
+    saveUserDocuments(user.id, realUserDocs);
+    handleAddAuditLog(
+      'PERMISSION_CHECK',
+      'Nettoyage des documents de démonstration',
+      'Suppression réussie des modèles d\'exemple. L\'espace ne contient désormais que les vrais documents de l\'utilisateur.'
+    );
+  };
+
   const handleAskAi = (promptText: string) => {
     setChatInitialPrompt(promptText);
     setActiveTab('chat');
@@ -362,6 +375,7 @@ export default function InstitutionAiPlatformPage() {
               onTriggerUpload={() => handleTabChange('documents')}
               onAddDocument={handleAddDocument}
               onAddMultipleDocuments={handleAddMultipleDocuments}
+              onPurgeDemoDocs={handlePurgeDemoDocs}
             />
           )}
 
@@ -397,6 +411,7 @@ export default function InstitutionAiPlatformPage() {
               onDeleteDocument={handleDeleteDocument}
               onUpdateDocument={handleUpdateDocument}
               onSelectDocument={setSelectedDocForDetails}
+              onPurgeDemoDocs={handlePurgeDemoDocs}
             />
           )}
 
