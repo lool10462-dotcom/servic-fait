@@ -39,6 +39,43 @@ export interface WorkspaceInfo {
   memberCount: number;
 }
 
+export interface DocumentFolder {
+  id: string;
+  name: string;
+  parentId?: string | null;
+  color?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface DocumentVersionItem {
+  id: string;
+  versionNumber: string;
+  createdAt: string;
+  fileSize: number;
+  storagePath: string;
+  r2Key?: string; // Compatibilité ascendante
+  author: string;
+  changelog?: string;
+}
+
+export interface DocumentShareItem {
+  targetType: 'user' | 'workspace';
+  targetId: string;
+  targetName: string;
+  permission: 'read' | 'comment' | 'edit';
+  sharedAt: string;
+}
+
+export type PipelineStatus = 
+  | 'UPLOADING' 
+  | 'PROCESSING' 
+  | 'OCR' 
+  | 'INDEXING' 
+  | 'READY' 
+  | 'ERROR' 
+  | 'DELETED';
+
 export interface InstitutionDocument {
   id: string;
   title: string;
@@ -48,14 +85,17 @@ export interface InstitutionDocument {
   department: string;
   mimeType: DocumentMimeType;
   fileSize: number; // in bytes
-  r2Key: string;
+  storagePath: string;
+  r2Key?: string; // Compatibilité
   fileHash: string;
+  sha256?: string;
   version: string;
   language: 'Français' | 'Arabe' | 'Somali' | 'Anglais';
   pageCount: number;
   status: 'indexed' | 'processing' | 'ocr_pending' | 'error';
   ocrApplied: boolean;
-  qdrantVectorCount: number;
+  qdrantVectorCount?: number;
+  chromaVectorCount?: number;
   uploadedAt: string;
   updatedAt: string;
   author: string;
@@ -66,6 +106,31 @@ export interface InstitutionDocument {
   localFolderSource?: string;
   isLocalSynced?: boolean;
   fileTypeGroup?: 'pdf' | 'word' | 'excel' | 'powerpoint' | 'image' | 'other';
+  folderId?: string | null;
+  isDeleted?: boolean;
+  deletedAt?: string;
+  deletedBy?: string;
+  originalFolderName?: string;
+  originalFolderPath?: string;
+  versions?: DocumentVersionItem[];
+  shares?: DocumentShareItem[];
+  pipelineStatus?: PipelineStatus;
+}
+
+export interface FolderDeleteSummary {
+  folderId: string;
+  folderName: string;
+  documentCount: number;
+  subFolderCount: number;
+  totalSizeBytes: number;
+}
+
+export interface LocalSyncOptions {
+  autoSync: boolean;
+  localDeletePolicy: 'trash' | 'permanent'; // 'trash' = déplace dans la corbeille du site, 'permanent' = suppression définitive
+  ocrEnabled: boolean;
+  chunkTokens: number;
+  allowedExtensions: string[];
 }
 
 export interface DocumentChunk {

@@ -96,8 +96,8 @@ export default function DocPlatformDetailsModal({
               </div>
 
               <div className="p-3 rounded-xl bg-slate-950/40 border border-white/5">
-                <span className="text-[10px] text-slate-500 block">Vecteurs Qdrant</span>
-                <span className="text-emerald-400 font-mono font-semibold">{docItem.qdrantVectorCount} chunks</span>
+                <span className="text-[10px] text-slate-500 block">Vecteurs ChromaDB</span>
+                <span className="text-emerald-400 font-mono font-semibold">{docItem.chromaVectorCount ?? docItem.qdrantVectorCount ?? 0} chunks</span>
               </div>
 
               <div className="p-3 rounded-xl bg-slate-950/40 border border-white/5">
@@ -116,17 +116,17 @@ export default function DocPlatformDetailsModal({
               </div>
             </div>
 
-            {/* Cloudflare R2 Info */}
+            {/* Sovereign Storage Info */}
             <div className="p-3.5 rounded-xl bg-slate-950/50 border border-white/5 space-y-1">
               <div className="flex items-center gap-1.5 text-slate-400 font-mono text-[10.5px]">
                 <HardDrive className="w-3.5 h-3.5 text-blue-400" />
-                <span>R2 Sovereign Path :</span>
+                <span>Sovereign Storage Path :</span>
               </div>
               <div className="text-slate-300 font-mono text-[10px] truncate">
-                {docItem.r2Key}
+                {docItem.storagePath || docItem.r2Key}
               </div>
               <div className="text-slate-500 font-mono text-[10px] truncate">
-                Hash : {docItem.fileHash}
+                Hash SHA-256 : {docItem.sha256 || docItem.fileHash}
               </div>
             </div>
 

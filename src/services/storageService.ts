@@ -1,38 +1,66 @@
-import { supabase } from '../lib/supabase';
-
 /**
  * ============================================================================
- * SERVICE DE STOCKAGE SOUVERAIN CNIPLC (R2 via SDK SUPABASE)
+ * SERVICE DE STOCKAGE LOCAL SOUVERAIN (100% SANS CLOUDFLARE R2)
  * ============================================================================
  * 
- * Règle d'isolation souveraine stricte :
- * Tout fichier est obligatoirement stocké sous le préfixe :
- * `r2/users/{supabase_user_uuid}/{folder}/{fileName}`
+ * Structure normalisée du stockage :
+ * /storage
+ *    /users
+ *       /{user_id}
+ *          /documents
+ *          /images
+ *          /presentations
+ *          /spreadsheets
+ *          /generated
+ *          /exports
+ *          /trash
+ *    /shared
+ *    /temporary
  * 
- * Aucune lecture ou écriture croisée entre utilisateurs n'est autorisée.
+ * Formats pris en charge :
+ * PDF, DOC, DOCX, XLS, XLSX, PPT, PPTX, TXT, CSV, JPG, JPEG, PNG, WEBP, TIFF, BMP.
+ * 
+ * Stockage persistant et performant géré localement via IndexedDB sans aucun
+ * appel externe ni dépendance vers Cloudflare R2.
  */
 
-export const R2_BUCKET_NAME = 
-  import.meta.env.VITE_R2_BUCKET_NAME || 
-  import.meta.env.R2_BUCKET_NAME || 
-  'cniplc-documents-prod';
+export const STORAGE_ROOT = '/storage';
+export const SOVEREIGN_USERS_ROOT = `${STORAGE_ROOT}/users`;
+export const SOVEREIGN_SHARED_ROOT = `${STORAGE_ROOT}/shared`;
+export const SOVEREIGN_TEMP_ROOT = `${STORAGE_ROOT}/temporary`;
 
-export const R2_SOVEREIGN_ROOT = 'r2/users';
+// Alias de rétrocompatibilité conservé pour éviter toute rupture d'import,
+// mais pointant rigoureusement sur le stockage local souverain.
+export const R2_BUCKET_NAME = 'sovereign-local-storage';
+export const R2_SOVEREIGN_ROOT = SOVEREIGN_USERS_ROOT;
+
+export type SupportedFolder = 
+  | 'documents' 
+  | 'images' 
+  | 'presentations' 
+  | 'spreadsheets' 
+  | 'generated' 
+  | 'exports' 
+  | 'trash'
+  | string;
 
 export interface StorageUploadOptions {
-  folder?: 'documents' | 'attachments' | 'backups' | 'scans' | string;
+  folder?: SupportedFolder;
   contentType?: string;
   upsert?: boolean;
   cacheControl?: string;
+  metadata?: Record<string, any>;
 }
 
 export interface StorageUploadResult {
   success: boolean;
-  r2Key: string;
+  storagePath: string;
+  r2Key: string; // Alias de compatibilité
   fileName: string;
   folder: string;
-  fileSize?: number;
-  mimeType?: string;
+  fileSize: number;
+  mimeType: string;
+  sha256: string;
   signedUrl?: string;
   publicUrl?: string;
   error?: string;
@@ -40,440 +68,501 @@ export interface StorageUploadResult {
 
 export interface StorageSignedUrlResult {
   signedUrl: string | null;
-  r2Key: string;
+  storagePath: string;
+  r2Key: string; // Alias
   expiresIn: number;
   error?: string;
 }
 
-export interface StorageFileItem {
-  name: string;
-  id?: string;
-  updated_at?: string;
-  created_at?: string;
-  last_accessed_at?: string;
-  metadata?: Record<string, any>;
-  r2Key: string;
+export interface StoredFileRecord {
+  storagePath: string;
+  userId: string;
+  folder: string;
+  fileName: string;
+  mimeType: string;
+  fileSize: number;
+  sha256: string;
+  data: ArrayBuffer;
+  createdAt: string;
+  updatedAt: string;
+  isDeleted?: boolean;
+  deletedAt?: string;
 }
 
-// ----------------------------------------------------------------------------
-// GESTION DES CHEMINS SOUVERAINS & ISOLATION
-// ----------------------------------------------------------------------------
+const DB_NAME = 'sovereign_local_storage_db';
+const DB_VERSION = 1;
+const STORE_NAME = 'files';
 
 /**
- * Nettoie un nom de fichier pour éviter l'injection de chemins (Path Traversal).
+ * Gestionnaire IndexedDB pour le stockage binaire local
+ */
+function openLocalDb(): Promise<IDBDatabase> {
+  return new Promise((resolve, reject) => {
+    if (typeof window === 'undefined' || !window.indexedDB) {
+      reject(new Error('IndexedDB non disponible dans cet environnement.'));
+      return;
+    }
+    const request = indexedDB.open(DB_NAME, DB_VERSION);
+    request.onupgradeneeded = (event) => {
+      const db = (event.target as IDBOpenDBRequest).result;
+      if (!db.objectStoreNames.contains(STORE_NAME)) {
+        const store = db.createObjectStore(STORE_NAME, { keyPath: 'storagePath' });
+        store.createIndex('userId', 'userId', { unique: false });
+        store.createIndex('folder', 'folder', { unique: false });
+        store.createIndex('sha256', 'sha256', { unique: false });
+      }
+    };
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+/**
+ * Calcul d'empreinte cryptographique SHA-256 natif
+ */
+export async function computeSha256(data: ArrayBuffer | Uint8Array): Promise<string> {
+  if (typeof crypto !== 'undefined' && crypto.subtle) {
+    try {
+      const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+      const hashArray = Array.from(new Uint8Array(hashBuffer));
+      return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+    } catch (e) {
+      // fallback
+    }
+  }
+  // Fallback hachage simple
+  let hash = 0;
+  const bytes = new Uint8Array(data);
+  for (let i = 0; i < bytes.length; i++) {
+    hash = ((hash << 5) - hash) + bytes[i];
+    hash |= 0;
+  }
+  return `sha256_fallback_${Math.abs(hash).toString(16)}`;
+}
+
+/**
+ * Nettoie le nom de fichier pour garantir l'intégrité du chemin
  */
 export function sanitizeFileName(fileName: string): string {
   if (!fileName) return `file_${Date.now()}`;
   return fileName
     .replace(/\\/g, '/')
-    .replace(/\.\./g, '') // Évite ../
+    .replace(/\.\./g, '')
     .replace(/[^a-zA-Z0-9.\-_]/g, '_');
 }
 
 /**
- * Construit un chemin R2 strictement cloisonné pour un utilisateur donné.
- * Format : `r2/users/{supabase_user_uuid}/{folder}/{fileName}`
+ * Construit un chemin de stockage local souverain selon la structure obligatoire :
+ * /storage/users/{user_id}/{folder}/{fileName}
  */
-export function buildUserR2Path(
+export function buildUserStoragePath(
   userId: string,
-  folder: string = 'documents',
+  folder: SupportedFolder = 'documents',
   fileName: string
 ): string {
   if (!userId || typeof userId !== 'string') {
-    throw new Error('[StorageService] Identifiant supabase_user_uuid obligatoire pour construire le chemin R2.');
+    throw new Error('[StorageService] user_id obligatoire pour construire le chemin de stockage.');
   }
-  const cleanFolder = folder.replace(/^\/+|\/+$/g, '').replace(/[^a-zA-Z0-9\-_/]/g, '_');
+  const cleanFolder = folder.replace(/^\/+|\/+$/g, '').replace(/[^a-zA-Z0-9\-_]/g, '_');
   const cleanFileName = sanitizeFileName(fileName);
-  return `${R2_SOVEREIGN_ROOT}/${userId}/${cleanFolder}/${cleanFileName}`;
+  return `${SOVEREIGN_USERS_ROOT}/${userId}/${cleanFolder}/${cleanFileName}`;
+}
+
+// Alias historique pour compatibilité ascendante immédiate
+export const buildUserR2Path = buildUserStoragePath;
+
+/**
+ * Valide l'accès souverain de l'utilisateur à un chemin
+ */
+export function validateUserAccess(userId: string, storagePath: string): boolean {
+  if (!userId || !storagePath) return false;
+  const userPrefix = `${SOVEREIGN_USERS_ROOT}/${userId}/`;
+  const legacyPrefix = `r2/users/${userId}/`;
+  return storagePath.startsWith(userPrefix) || storagePath.startsWith(legacyPrefix) || storagePath.startsWith(`${SOVEREIGN_SHARED_ROOT}/`);
 }
 
 /**
- * Valide qu'une clé R2 appartient bien à l'utilisateur courant.
- * Renvoie true si valide, ou false en cas de tentative d'accès non autorisé.
+ * Décompose un chemin de stockage
  */
-export function validateUserAccess(userId: string, r2Key: string): boolean {
-  if (!userId || !r2Key) return false;
-  const expectedPrefix = `${R2_SOVEREIGN_ROOT}/${userId}/`;
-  return r2Key.startsWith(expectedPrefix);
-}
-
-/**
- * Décompose une clé R2 souveraine en ses composantes.
- */
-export function parseUserR2Path(r2Key: string): {
+export function parseUserStoragePath(storagePath: string): {
   userId: string;
   folder: string;
   fileName: string;
 } | null {
-  if (!r2Key || !r2Key.startsWith(`${R2_SOVEREIGN_ROOT}/`)) {
-    return null;
-  }
-  const parts = r2Key.split('/');
-  // parts[0] = 'r2', parts[1] = 'users', parts[2] = userId, parts[3] = folder, parts[4]... = fileName
-  if (parts.length < 5) return null;
-  const userId = parts[2];
-  const folder = parts[3];
-  const fileName = parts.slice(4).join('/');
-  return { userId, folder, fileName };
+  if (!storagePath) return null;
+  const clean = storagePath.replace(/^\/storage\/users\//, '').replace(/^r2\/users\//, '');
+  const parts = clean.split('/');
+  if (parts.length < 3) return null;
+  return {
+    userId: parts[0],
+    folder: parts[1],
+    fileName: parts.slice(2).join('/')
+  };
 }
 
-// ----------------------------------------------------------------------------
-// OPÉRATIONS DE STOCKAGE VIA SDK SUPABASE
-// ----------------------------------------------------------------------------
+export const parseUserR2Path = parseUserStoragePath;
 
+/**
+ * Objet principal de service de stockage local souverain
+ */
 export const storageService = {
-  /**
-   * Nom du bucket configuré
-   */
+  root: STORAGE_ROOT,
   bucketName: R2_BUCKET_NAME,
+  buildPath: buildUserStoragePath,
+  parsePath: parseUserStoragePath,
 
   /**
-   * Construit le chemin souverain isolé pour l'utilisateur
-   */
-  buildPath: buildUserR2Path,
-
-  /**
-   * Valide l'isolation de sécurité
-   */
-  validateAccess: validateUserAccess,
-
-  /**
-   * Décompose la clé
-   */
-  parsePath: parseUserR2Path,
-
-  /**
-   * Téléverse un fichier dans le bucket R2 en respectant l'isolation stricte de l'utilisateur.
+   * Téléverse / Enregistre un fichier localement avec intégrité SHA-256
    */
   async uploadFile(
     userId: string,
-    file: File | Blob | ArrayBuffer | Uint8Array,
+    file: File | Blob | ArrayBuffer,
     fileName: string,
     options: StorageUploadOptions = {}
   ): Promise<StorageUploadResult> {
     const folder = options.folder || 'documents';
-    const r2Key = buildUserR2Path(userId, folder, fileName);
+    const storagePath = buildUserStoragePath(userId, folder, fileName);
 
-    // Détermination du Content-Type
-    const mimeType = 
-      options.contentType || 
-      (file instanceof File ? file.type : 'application/octet-stream');
-    const fileSize = 
-      file instanceof File || file instanceof Blob ? file.size : undefined;
+    let arrayBuffer: ArrayBuffer;
+    let mimeType = options.contentType || 'application/octet-stream';
+    let size = 0;
+
+    if (file instanceof ArrayBuffer) {
+      arrayBuffer = file;
+      size = file.byteLength;
+    } else if (file instanceof Blob) {
+      arrayBuffer = await file.arrayBuffer();
+      size = file.size;
+      mimeType = file.type || mimeType;
+    } else {
+      throw new Error('Format de fichier non pris en charge pour le stockage local.');
+    }
+
+    const sha256 = await computeSha256(arrayBuffer);
 
     try {
-      // Téléversement via le client Supabase Storage
-      const { data, error } = await supabase.storage
-        .from(R2_BUCKET_NAME)
-        .upload(r2Key, file, {
-          contentType: mimeType,
-          upsert: options.upsert !== undefined ? options.upsert : true,
-          cacheControl: options.cacheControl || '3600',
-        });
+      const db = await openLocalDb();
+      const tx = db.transaction(STORE_NAME, 'readwrite');
+      const store = tx.objectStore(STORE_NAME);
 
-      if (error) {
-        console.warn(`[StorageService] Avertissement Supabase Storage (${error.message}). Utilisation du mode résilient local.`);
-        // Mode résilient avec URL simulée si le bucket Supabase distant n'a pas encore la policy
-        return {
-          success: true,
-          r2Key,
-          fileName,
-          folder,
-          fileSize,
-          mimeType,
-          signedUrl: URL.createObjectURL(file instanceof Blob ? file : new Blob([file])),
-          error: undefined,
-        };
-      }
+      const record: StoredFileRecord = {
+        storagePath,
+        userId,
+        folder,
+        fileName: sanitizeFileName(fileName),
+        mimeType,
+        fileSize: size,
+        sha256,
+        data: arrayBuffer,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        isDeleted: false
+      };
 
-      // Génération d'une URL signée pour accès immédiat
-      const signed = await this.createSignedUrl(userId, r2Key, 3600);
+      await new Promise<void>((resolve, reject) => {
+        const req = store.put(record);
+        req.onsuccess = () => resolve();
+        req.onerror = () => reject(req.error);
+      });
+
+      // Génère une URL d'accès local blob sécurisée
+      const blob = new Blob([arrayBuffer], { type: mimeType });
+      const localUrl = URL.createObjectURL(blob);
 
       return {
         success: true,
-        r2Key: data?.path || r2Key,
-        fileName,
+        storagePath,
+        r2Key: storagePath,
+        fileName: record.fileName,
         folder,
-        fileSize,
+        fileSize: size,
         mimeType,
-        signedUrl: signed.signedUrl || undefined,
+        sha256,
+        signedUrl: localUrl,
+        publicUrl: localUrl
       };
     } catch (err: any) {
-      console.error('[StorageService] Erreur lors du téléversement R2:', err);
-      // Fallback gracieux en environnement de dev
+      console.error('[StorageService Local] Erreur de sauvegarde locale:', err);
       return {
-        success: true,
-        r2Key,
+        success: false,
+        storagePath,
+        r2Key: storagePath,
         fileName,
         folder,
-        fileSize,
+        fileSize: size,
         mimeType,
-        signedUrl: file instanceof Blob ? URL.createObjectURL(file) : undefined,
-        error: err?.message,
+        sha256,
+        error: err.message || 'Erreur inconnue lors de la sauvegarde locale'
       };
     }
   },
 
   /**
-   * Génère une URL signée temporaire et sécurisée pour un fichier d'un utilisateur.
+   * Récupère le fichier binaire sous forme de Blob
+   */
+  async getFile(userId: string, storagePath: string): Promise<Blob | null> {
+    if (!validateUserAccess(userId, storagePath)) {
+      console.warn(`[StorageService] Accès refusé à ${storagePath} pour ${userId}`);
+      return null;
+    }
+
+    try {
+      const db = await openLocalDb();
+      const tx = db.transaction(STORE_NAME, 'readonly');
+      const store = tx.objectStore(STORE_NAME);
+
+      const record = await new Promise<StoredFileRecord | undefined>((resolve, reject) => {
+        const req = store.get(storagePath);
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+      });
+
+      if (!record) return null;
+      return new Blob([record.data], { type: record.mimeType });
+    } catch (e) {
+      console.error('[StorageService] Erreur lecture fichier:', e);
+      return null;
+    }
+  },
+
+  /**
+   * Crée une URL d'accès locale valide pour le téléchargement ou l'affichage
    */
   async createSignedUrl(
     userId: string,
-    r2Key: string,
+    storagePath: string,
     expiresInSeconds: number = 3600
   ): Promise<StorageSignedUrlResult> {
-    // Vérification de sécurité souveraine
-    if (!validateUserAccess(userId, r2Key)) {
-      const errMsg = `[StorageService] Violation de sécurité RLS : l'utilisateur ${userId} ne peut pas accéder à ${r2Key}`;
-      console.error(errMsg);
+    const blob = await this.getFile(userId, storagePath);
+    if (!blob) {
       return {
         signedUrl: null,
-        r2Key,
+        storagePath,
+        r2Key: storagePath,
         expiresIn: expiresInSeconds,
-        error: errMsg,
+        error: 'Fichier non trouvé dans le stockage local'
       };
     }
 
-    try {
-      const { data, error } = await supabase.storage
-        .from(R2_BUCKET_NAME)
-        .createSignedUrl(r2Key, expiresInSeconds);
-
-      if (error) {
-        // En cas d'erreur de signature distante (bucket non encore provisionné), URL de secours
-        return {
-          signedUrl: null,
-          r2Key,
-          expiresIn: expiresInSeconds,
-          error: error.message,
-        };
-      }
-
-      return {
-        signedUrl: data.signedUrl,
-        r2Key,
-        expiresIn: expiresInSeconds,
-      };
-    } catch (err: any) {
-      return {
-        signedUrl: null,
-        r2Key,
-        expiresIn: expiresInSeconds,
-        error: err?.message || 'Erreur inconnue de génération d\'URL signée',
-      };
-    }
-  },
-
-  /**
-   * Génère plusieurs URLs signées en lot (Batch).
-   */
-  async createSignedUrls(
-    userId: string,
-    r2Keys: string[],
-    expiresInSeconds: number = 3600
-  ): Promise<StorageSignedUrlResult[]> {
-    const validKeys = r2Keys.filter(key => validateUserAccess(userId, key));
-    
-    if (validKeys.length !== r2Keys.length) {
-      console.warn('[StorageService] Certaines clés ont été rejetées car elles ne correspondent pas au périmètre souverain de l\'utilisateur.');
-    }
-
-    try {
-      const { data, error } = await supabase.storage
-        .from(R2_BUCKET_NAME)
-        .createSignedUrls(validKeys, expiresInSeconds);
-
-      if (error || !data) {
-        throw error || new Error('Impossible de générer les URLs signées en lot');
-      }
-
-      return data.map(item => ({
-        signedUrl: item.signedUrl,
-        r2Key: item.path || '',
-        expiresIn: expiresInSeconds,
-        error: item.error || undefined,
-      }));
-    } catch (err: any) {
-      // Fallback individuel
-      return Promise.all(validKeys.map(k => this.createSignedUrl(userId, k, expiresInSeconds)));
-    }
-  },
-
-  /**
-   * Obtient l'URL publique d'un document si le bucket ou dossier est configuré en accès public.
-   */
-  getPublicUrl(userId: string, r2Key: string): { publicUrl: string; error?: string } {
-    if (!validateUserAccess(userId, r2Key)) {
-      return {
-        publicUrl: '',
-        error: `Accès non autorisé pour la ressource ${r2Key}`,
-      };
-    }
-
-    const { data } = supabase.storage
-      .from(R2_BUCKET_NAME)
-      .getPublicUrl(r2Key);
-
+    const signedUrl = URL.createObjectURL(blob);
     return {
-      publicUrl: data.publicUrl,
+      signedUrl,
+      storagePath,
+      r2Key: storagePath,
+      expiresIn: expiresInSeconds
     };
   },
 
   /**
-   * Télécharge les données brutes d'un fichier (Blob).
+   * URL locale directe
    */
-  async downloadFile(
-    userId: string,
-    r2Key: string
-  ): Promise<{ data: Blob | null; error?: string }> {
-    if (!validateUserAccess(userId, r2Key)) {
-      return {
-        data: null,
-        error: `Accès souverain refusé pour la clé ${r2Key}`,
-      };
-    }
+  getPublicUrl(userId: string, storagePath: string): { publicUrl: string; error?: string } {
+    return {
+      publicUrl: storagePath
+    };
+  },
 
+  /**
+   * Déplace un fichier vers le dossier corbeille
+   */
+  async moveToTrash(userId: string, storagePath: string): Promise<{ success: boolean; newPath?: string }> {
     try {
-      const { data, error } = await supabase.storage
-        .from(R2_BUCKET_NAME)
-        .download(r2Key);
+      const db = await openLocalDb();
+      const tx = db.transaction(STORE_NAME, 'readwrite');
+      const store = tx.objectStore(STORE_NAME);
 
-      if (error) {
-        return { data: null, error: error.message };
+      const record = await new Promise<StoredFileRecord | undefined>((resolve, reject) => {
+        const req = store.get(storagePath);
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+      });
+
+      if (!record) return { success: false };
+
+      const trashPath = buildUserStoragePath(userId, 'trash', record.fileName);
+      record.isDeleted = true;
+      record.deletedAt = new Date().toISOString();
+      record.folder = 'trash';
+      record.storagePath = trashPath;
+
+      await new Promise<void>((resolve, reject) => {
+        const req = store.put(record);
+        req.onsuccess = () => resolve();
+        req.onerror = () => reject(req.error);
+      });
+
+      // Supprime l'ancienne clé si le chemin a changé
+      if (trashPath !== storagePath) {
+        store.delete(storagePath);
       }
-      return { data };
-    } catch (err: any) {
-      return { data: null, error: err?.message || 'Erreur de téléchargement' };
+
+      return { success: true, newPath: trashPath };
+    } catch (e) {
+      console.error('[StorageService] Erreur mise en corbeille:', e);
+      return { success: false };
     }
   },
 
   /**
-   * Supprime un fichier du bucket R2 pour l'utilisateur spécifié.
+   * Restaure un fichier de la corbeille vers son emplacement d'origine
    */
-  async deleteFile(
-    userId: string,
-    r2Key: string
-  ): Promise<{ success: boolean; error?: string }> {
-    if (!validateUserAccess(userId, r2Key)) {
-      return {
-        success: false,
-        error: `Tentative de suppression non autorisée sur ${r2Key}`,
-      };
+  async restoreFromTrash(
+    userId: string, 
+    currentPath: string, 
+    targetFolder: string = 'documents'
+  ): Promise<{ success: boolean; restoredPath?: string }> {
+    try {
+      const db = await openLocalDb();
+      const tx = db.transaction(STORE_NAME, 'readwrite');
+      const store = tx.objectStore(STORE_NAME);
+
+      const record = await new Promise<StoredFileRecord | undefined>((resolve, reject) => {
+        const req = store.get(currentPath);
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+      });
+
+      if (!record) return { success: false };
+
+      const restoredPath = buildUserStoragePath(userId, targetFolder, record.fileName);
+      record.isDeleted = false;
+      record.deletedAt = undefined;
+      record.folder = targetFolder;
+      record.storagePath = restoredPath;
+
+      await new Promise<void>((resolve, reject) => {
+        const req = store.put(record);
+        req.onsuccess = () => resolve();
+        req.onerror = () => reject(req.error);
+      });
+
+      if (restoredPath !== currentPath) {
+        store.delete(currentPath);
+      }
+
+      return { success: true, restoredPath };
+    } catch (e) {
+      console.error('[StorageService] Erreur restauration:', e);
+      return { success: false };
+    }
+  },
+
+  /**
+   * Supprime définitivement un fichier du stockage local
+   */
+  async deleteFile(userId: string, storagePath: string): Promise<{ success: boolean; error?: string }> {
+    if (!validateUserAccess(userId, storagePath)) {
+      return { success: false, error: 'Tentative de suppression non autorisée' };
     }
 
     try {
-      const { error } = await supabase.storage
-        .from(R2_BUCKET_NAME)
-        .remove([r2Key]);
+      const db = await openLocalDb();
+      const tx = db.transaction(STORE_NAME, 'readwrite');
+      const store = tx.objectStore(STORE_NAME);
 
-      if (error) {
-        return { success: false, error: error.message };
-      }
+      await new Promise<void>((resolve, reject) => {
+        const req = store.delete(storagePath);
+        req.onsuccess = () => resolve();
+        req.onerror = () => reject(req.error);
+      });
+
       return { success: true };
     } catch (err: any) {
-      return { success: false, error: err?.message || 'Erreur lors de la suppression' };
+      return { success: false, error: err.message };
     }
   },
 
   /**
-   * Supprime une liste de fichiers de l'utilisateur.
+   * Suppression définitive groupée
    */
-  async deleteFiles(
-    userId: string,
-    r2Keys: string[]
-  ): Promise<{ success: boolean; count: number; error?: string }> {
-    const authorizedKeys = r2Keys.filter(k => validateUserAccess(userId, k));
-    if (authorizedKeys.length === 0) {
-      return { success: true, count: 0 };
+  async deleteFiles(userId: string, storagePaths: string[]): Promise<{ success: boolean; deleted: string[] }> {
+    const deleted: string[] = [];
+    for (const p of storagePaths) {
+      const res = await this.deleteFile(userId, p);
+      if (res.success) deleted.push(p);
     }
+    return { success: true, deleted };
+  },
 
+  /**
+   * Liste les fichiers d'un utilisateur dans un dossier donné
+   */
+  async listFiles(userId: string, folder?: string): Promise<StoredFileRecord[]> {
     try {
-      const { error } = await supabase.storage
-        .from(R2_BUCKET_NAME)
-        .remove(authorizedKeys);
+      const db = await openLocalDb();
+      const tx = db.transaction(STORE_NAME, 'readonly');
+      const store = tx.objectStore(STORE_NAME);
+      const userIndex = store.index('userId');
 
-      if (error) {
-        return { success: false, count: 0, error: error.message };
+      const records = await new Promise<StoredFileRecord[]>((resolve, reject) => {
+        const req = userIndex.getAll(userId);
+        req.onsuccess = () => resolve(req.result || []);
+        req.onerror = () => reject(req.error);
+      });
+
+      if (folder) {
+        return records.filter(r => r.folder === folder);
       }
-      return { success: true, count: authorizedKeys.length };
-    } catch (err: any) {
-      return { success: false, count: 0, error: err?.message };
+      return records;
+    } catch (e) {
+      console.warn('[StorageService] Erreur listage:', e);
+      return [];
     }
   },
 
   /**
-   * Liste les fichiers de l'utilisateur dans un sous-dossier ('documents', 'attachments', etc.).
+   * Vide entièrement la corbeille d'un utilisateur
    */
-  async listUserFiles(
-    userId: string,
-    folder: string = 'documents',
-    options: { limit?: number; offset?: number; sortBy?: { column: string; order: string } } = {}
-  ): Promise<{ files: StorageFileItem[]; error?: string }> {
-    const targetFolder = `${R2_SOVEREIGN_ROOT}/${userId}/${folder}`.replace(/^\/+|\/+$/g, '');
-
+  async purgeTrash(userId: string): Promise<{ count: number }> {
     try {
-      const { data, error } = await supabase.storage
-        .from(R2_BUCKET_NAME)
-        .list(targetFolder, {
-          limit: options.limit || 100,
-          offset: options.offset || 0,
-          sortBy: options.sortBy as any || { column: 'name', order: 'asc' },
-        });
-
-      if (error) {
-        return { files: [], error: error.message };
+      const files = await this.listFiles(userId, 'trash');
+      for (const f of files) {
+        await this.deleteFile(userId, f.storagePath);
       }
-
-      const files: StorageFileItem[] = (data || []).map(item => ({
-        name: item.name,
-        id: item.id,
-        updated_at: item.updated_at,
-        created_at: item.created_at,
-        last_accessed_at: item.last_accessed_at,
-        metadata: item.metadata,
-        r2Key: `${targetFolder}/${item.name}`,
-      }));
-
-      return { files };
-    } catch (err: any) {
-      return { files: [], error: err?.message || 'Erreur de listing' };
+      return { count: files.length };
+    } catch (e) {
+      return { count: 0 };
     }
   },
 
   /**
-   * Vérifie la santé et la connectivité du bucket de stockage.
+   * Suppression définitive complète de l'espace utilisateur (Action Administrateur)
    */
-  async checkStorageHealth(): Promise<{
-    connected: boolean;
-    bucketExists: boolean;
-    bucketName: string;
+  async deleteUserStorage(userId: string): Promise<{ deletedCount: number }> {
+    try {
+      const files = await this.listFiles(userId);
+      for (const f of files) {
+        await this.deleteFile(userId, f.storagePath);
+      }
+      return { deletedCount: files.length };
+    } catch (e) {
+      return { deletedCount: 0 };
+    }
+  },
+
+  /**
+   * Diagnostic de santé du stockage local souverain
+   */
+  async checkBucketHealth(): Promise<{
+    operational: boolean;
+    storageType: string;
     message: string;
   }> {
     try {
-      const { data: bucket, error } = await supabase.storage.getBucket(R2_BUCKET_NAME);
-      if (error) {
-        return {
-          connected: true,
-          bucketExists: false,
-          bucketName: R2_BUCKET_NAME,
-          message: `Connecté à Supabase, mais le bucket "${R2_BUCKET_NAME}" n'a pas encore été créé ou n'est pas accessible : ${error.message}`,
-        };
-      }
+      await openLocalDb();
       return {
-        connected: true,
-        bucketExists: true,
-        bucketName: R2_BUCKET_NAME,
-        message: `Bucket "${R2_BUCKET_NAME}" opérationnel et accessible.`,
+        operational: true,
+        storageType: 'Local Souverain IndexedDB (Aucun R2)',
+        message: 'Stockage local cloisonné opérationnel, sécurisé et 100% autonome.'
       };
-    } catch (err: any) {
+    } catch (e: any) {
       return {
-        connected: false,
-        bucketExists: false,
-        bucketName: R2_BUCKET_NAME,
-        message: `Erreur de connexion Supabase Storage : ${err?.message || 'Erreur réseau'}`,
+        operational: false,
+        storageType: 'Erreur',
+        message: `Erreur d'accès au stockage local : ${e.message}`
       };
     }
-  },
+  }
 };
 
 export default storageService;

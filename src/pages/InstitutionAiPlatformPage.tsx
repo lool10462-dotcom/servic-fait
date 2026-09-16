@@ -7,7 +7,11 @@ import {
   Lock, 
   Building2, 
   Terminal,
-  ExternalLink
+  ExternalLink,
+  ArrowRight,
+  X,
+  Search,
+  Bot
 } from 'lucide-react';
 import DocPlatformHeader from '../components/document-platform/DocPlatformHeader';
 import DocPlatformSidebar from '../components/document-platform/DocPlatformSidebar';
@@ -39,6 +43,8 @@ export default function InstitutionAiPlatformPage() {
   const { user, isAuthenticated, isLoading, loginWithCode } = useAuth();
 
   const [activeTab, setActiveTab] = useState<string>('dashboard');
+  const [previousTab, setPreviousTab] = useState<string | null>(null);
+  const [showLoginAiBanner, setShowLoginAiBanner] = useState<boolean>(false);
   const [documents, setDocuments] = useState<InstitutionDocument[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>([]);
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -53,6 +59,62 @@ export default function InstitutionAiPlatformPage() {
   const [isRegisterOpen, setIsRegisterOpen] = useState<boolean>(false);
   const [isLoginOpen, setIsLoginOpen] = useState<boolean>(false);
   const [isSecurityOpen, setIsSecurityOpen] = useState<boolean>(false);
+
+  // Check if user recently logged in with code to display quick access prompt
+  useEffect(() => {
+    if (isAuthenticated && sessionStorage.getItem('cniplc_code_login_success') === 'true') {
+      setShowLoginAiBanner(true);
+      sessionStorage.removeItem('cniplc_code_login_success');
+    }
+  }, [isAuthenticated]);
+
+  const handleTabChange = (newTab: string) => {
+    if (newTab !== activeTab) {
+      setPreviousTab(activeTab);
+      setActiveTab(newTab);
+    }
+  };
+
+  const handleQuickJumpToAi = () => {
+    if (activeTab === 'chat') {
+      if (previousTab && previousTab !== 'chat') {
+        setActiveTab(previousTab);
+      } else {
+        setActiveTab('dashboard');
+      }
+    } else {
+      setPreviousTab(activeTab);
+      setActiveTab('chat');
+    }
+  };
+
+  const handleQuickJumpToSearch = () => {
+    if (activeTab === 'search') {
+      if (previousTab && previousTab !== 'search') {
+        setActiveTab(previousTab);
+      } else {
+        setActiveTab('dashboard');
+      }
+    } else {
+      setPreviousTab(activeTab);
+      setActiveTab('search');
+    }
+  };
+
+  // Keyboard Shortcuts (Alt+A for AI Chat, Alt+S for Search)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.altKey && (e.key === 'a' || e.key === 'A')) {
+        e.preventDefault();
+        handleQuickJumpToAi();
+      } else if (e.altKey && (e.key === 's' || e.key === 'S')) {
+        e.preventDefault();
+        handleQuickJumpToSearch();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [activeTab, previousTab]);
 
   // Sync isolated user data whenever authenticated user changes
   useEffect(() => {
@@ -69,22 +131,25 @@ export default function InstitutionAiPlatformPage() {
 
   const handleAddDocument = (newDoc: InstitutionDocument) => {
     if (!user) return;
-    // Enforce Sovereign Path Rule #13: r2/users/{supabase_user_uuid}/...
     const sovereignDoc: InstitutionDocument = {
       ...newDoc,
-      r2Key: newDoc.r2Key || `r2/users/${user.id}/documents/${newDoc.originalFilename}`,
+      storagePath: newDoc.storagePath || `/storage/users/${user.id}/documents/${newDoc.originalFilename}`,
+      r2Key: newDoc.r2Key || `/storage/users/${user.id}/documents/${newDoc.originalFilename}`,
+      chromaVectorCount: newDoc.chromaVectorCount || 10,
     };
     const updated = [sovereignDoc, ...documents];
     setDocuments(updated);
     saveUserDocuments(user.id, updated);
-    handleAddAuditLog('UPLOAD', sovereignDoc.title, `Nouveau document téléversé dans Cloudflare R2 (${sovereignDoc.r2Key})`);
+    handleAddAuditLog('UPLOAD', sovereignDoc.title, `Nouveau document enregistré dans le stockage local (${sovereignDoc.storagePath}) & indexé ChromaDB`);
   };
 
   const handleAddMultipleDocuments = (newDocs: InstitutionDocument[]) => {
     if (!user || newDocs.length === 0) return;
     const sovereignDocs = newDocs.map(doc => ({
       ...doc,
-      r2Key: doc.r2Key || `r2/users/${user.id}/documents/${doc.originalFilename}`,
+      storagePath: doc.storagePath || `/storage/users/${user.id}/documents/${doc.originalFilename}`,
+      r2Key: doc.r2Key || `/storage/users/${user.id}/documents/${doc.originalFilename}`,
+      chromaVectorCount: doc.chromaVectorCount || 10,
     }));
     const updated = [...sovereignDocs, ...documents];
     setDocuments(updated);
@@ -92,7 +157,7 @@ export default function InstitutionAiPlatformPage() {
     handleAddAuditLog(
       'UPLOAD',
       `${newDocs.length} documents ingérés`,
-      `Lot de ${newDocs.length} documents multi-formats indexés dans Cloudflare R2 & Qdrant`
+      `Lot de ${newDocs.length} documents multi-formats indexés dans le Stockage Local & ChromaDB`
     );
   };
 
@@ -103,8 +168,15 @@ export default function InstitutionAiPlatformPage() {
     setDocuments(updated);
     saveUserDocuments(user.id, updated);
     if (doc) {
-      handleAddAuditLog('PERMISSION_CHECK', doc.title, `Document supprimé du coffre-fort R2 par l'agent habilité`);
+      handleAddAuditLog('PERMISSION_CHECK', doc.title, `Document archivé/supprimé du stockage local par l'agent habilité`);
     }
+  };
+
+  const handleUpdateDocument = (updatedDoc: InstitutionDocument) => {
+    if (!user) return;
+    const updated = documents.map(d => d.id === updatedDoc.id ? updatedDoc : d);
+    setDocuments(updated);
+    saveUserDocuments(user.id, updated);
   };
 
   const handleAddAuditLog = (action: any, title: string, details: string) => {
@@ -199,7 +271,9 @@ export default function InstitutionAiPlatformPage() {
       {/* Top Institutional Header */}
       <DocPlatformHeader
         activeTab={activeTab}
-        onSelectTab={setActiveTab}
+        previousTab={previousTab}
+        onSelectTab={handleTabChange}
+        onQuickJumpToAi={handleQuickJumpToAi}
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
         onOpenSecurity={() => setIsSecurityOpen(true)}
@@ -207,12 +281,72 @@ export default function InstitutionAiPlatformPage() {
         onOpenRegister={() => setIsRegisterOpen(true)}
       />
 
+      {/* Floating Instant AI Access Prompt Banner after Login with Code */}
+      {showLoginAiBanner && (
+        <div className="relative z-20 max-w-7xl mx-auto px-4 lg:px-8 pt-3">
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className="flex flex-col sm:flex-row items-center justify-between gap-3 p-3.5 sm:p-4 rounded-2xl bg-gradient-to-r from-amber-500/15 via-purple-500/15 to-blue-500/15 border border-amber-500/30 backdrop-blur-md shadow-xl"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center shrink-0">
+                <Sparkles className="w-5 h-5 text-amber-400 animate-pulse" />
+              </div>
+              <div>
+                <div className="text-xs sm:text-sm font-bold text-white flex items-center gap-2">
+                  <span>Connexion réussie • Assistant IA & Recherche Sémantique</span>
+                  <span className="text-[10px] uppercase px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 font-mono">Prêt</span>
+                </div>
+                <p className="text-[11px] text-slate-300">
+                  Accédez instantanément au corpus documentaire officiel avec l'assistant RAG ou effectuez une recherche sémantique sans perdre votre vue actuelle.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 shrink-0 w-full sm:w-auto justify-end">
+              <button
+                onClick={() => {
+                  setShowLoginAiBanner(false);
+                  handleQuickJumpToSearch();
+                }}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900/80 hover:bg-slate-800 text-xs font-semibold text-slate-200 border border-white/10 transition cursor-pointer"
+              >
+                <Search className="w-3.5 h-3.5 text-emerald-400" />
+                <span>Recherche Sémantique</span>
+              </button>
+
+              <button
+                onClick={() => {
+                  setShowLoginAiBanner(false);
+                  handleQuickJumpToAi();
+                }}
+                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-xs font-bold text-slate-950 transition shadow-md shadow-amber-500/20 cursor-pointer"
+              >
+                <Bot className="w-3.5 h-3.5 text-slate-950" />
+                <span>Assistant IA (RAG)</span>
+                <ArrowRight className="w-3.5 h-3.5 ml-0.5" />
+              </button>
+
+              <button
+                onClick={() => setShowLoginAiBanner(false)}
+                className="p-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition cursor-pointer"
+                title="Masquer cette notification"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
       {/* Main Container with Sidebar + Dynamic Views */}
       <div className="flex-1 flex max-w-7xl w-full mx-auto relative z-10">
         {/* Navigation Sidebar */}
         <DocPlatformSidebar
           activeTab={activeTab}
-          onSelectTab={setActiveTab}
+          onSelectTab={handleTabChange}
           documentCount={documents.length}
           onOpenSecurity={() => setIsSecurityOpen(true)}
         />
@@ -222,10 +356,10 @@ export default function InstitutionAiPlatformPage() {
           {activeTab === 'dashboard' && (
             <DocPlatformDashboard
               documents={documents}
-              onSelectTab={setActiveTab}
+              onSelectTab={handleTabChange}
               onSelectDocument={setSelectedDocForDetails}
               onAskAiPrompt={handleAskAi}
-              onTriggerUpload={() => setActiveTab('documents')}
+              onTriggerUpload={() => handleTabChange('documents')}
               onAddDocument={handleAddDocument}
               onAddMultipleDocuments={handleAddMultipleDocuments}
             />
@@ -238,7 +372,7 @@ export default function InstitutionAiPlatformPage() {
               onSearchChange={setSearchQuery}
               onSelectDocument={setSelectedDocForDetails}
               onAskAiPrompt={handleAskAi}
-              onSelectTab={setActiveTab}
+              onSelectTab={handleTabChange}
             />
           )}
 
@@ -247,10 +381,10 @@ export default function InstitutionAiPlatformPage() {
               documents={documents}
               initialPrompt={chatInitialPrompt}
               onExportDocx={(title, content) => {
-                setActiveTab('generator');
+                handleTabChange('generator');
               }}
               onExportPdf={(title, content) => {
-                setActiveTab('generator');
+                handleTabChange('generator');
               }}
             />
           )}
@@ -261,6 +395,7 @@ export default function InstitutionAiPlatformPage() {
               onAddDocument={handleAddDocument}
               onAddMultipleDocuments={handleAddMultipleDocuments}
               onDeleteDocument={handleDeleteDocument}
+              onUpdateDocument={handleUpdateDocument}
               onSelectDocument={setSelectedDocForDetails}
             />
           )}
@@ -270,7 +405,7 @@ export default function InstitutionAiPlatformPage() {
               documents={documents}
               onSelectDocument={setSelectedDocForDetails}
               onAskAiPrompt={handleAskAi}
-              onSelectTab={setActiveTab}
+              onSelectTab={handleTabChange}
             />
           )}
 

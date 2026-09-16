@@ -16,8 +16,11 @@ import {
   Layers,
   FolderSync,
   FolderPlus,
-  Laptop
+  Laptop,
+  Zap,
+  Command
 } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import { InstitutionDocument } from '../../types/documentPlatform';
 import LocalFolderSyncManager from './LocalFolderSyncManager';
 
@@ -40,6 +43,22 @@ export default function DocPlatformDashboard({
   onAddDocument,
   onAddMultipleDocuments
 }: DocPlatformDashboardProps) {
+  const [isQuickAccessOpen, setIsQuickAccessOpen] = useState(true);
+
+  // Global hotkeys for instant quick navigation
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.altKey || e.metaKey) && e.key.toLowerCase() === 's') {
+        e.preventDefault();
+        onSelectTab('search');
+      } else if ((e.altKey || e.metaKey) && e.key.toLowerCase() === 'a') {
+        e.preventDefault();
+        onSelectTab('chat');
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onSelectTab]);
   const quickPrompts = [
     "Trouve-moi le rapport annuel sur la corruption de 2025.",
     "Donne-moi le document concernant la sensibilisation dans les écoles.",
@@ -64,7 +83,7 @@ export default function DocPlatformDashboard({
             Centralisation &amp; Analyse Intelligente des Documents
           </h1>
           <p className="text-slate-350 text-sm sm:text-base mt-2.5 leading-relaxed font-sans">
-            Recherchez en langage naturel, interrogez l'assistant IA avec citations de sources vérifiées, gérez vos fichiers sécurisés sur Cloudflare R2 et générez des rapports officiels conformes.
+            Recherchez en langage naturel, interrogez l'assistant IA avec citations de sources vérifiées, gérez vos fichiers sécurisés en stockage local souverain et générez des rapports officiels conformes.
           </p>
 
           {/* Quick Action Grid */}
@@ -318,6 +337,59 @@ export default function DocPlatformDashboard({
             })}
           </div>
         </div>
+      </div>
+
+      {/* Floating Quick Access Bar for Semantic Search & AI Assistant */}
+      <div className="fixed bottom-6 right-6 z-40 flex items-center gap-2">
+        {isQuickAccessOpen ? (
+          <div className="flex items-center gap-2 p-2 rounded-2xl bg-slate-900/95 backdrop-blur-xl border border-amber-500/30 shadow-2xl shadow-black/60 anim-card">
+            <div className="flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-bold text-amber-400 border-r border-white/10 shrink-0">
+              <Zap className="w-3.5 h-3.5 text-amber-400 fill-amber-400" />
+              <span>Accès Rapide</span>
+            </div>
+
+            <button
+              onClick={() => onSelectTab('search')}
+              title="Recherche Sémantique (Alt+S)"
+              className="flex items-center gap-2 px-3 py-2 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 text-amber-300 text-xs font-semibold transition-all hover:scale-105 active:scale-95 cursor-pointer shadow-sm"
+            >
+              <Search className="w-3.5 h-3.5 text-amber-400" />
+              <span>Recherche Sémantique</span>
+              <kbd className="hidden sm:inline-block px-1.5 py-0.5 rounded text-[10px] font-mono bg-slate-950/80 text-amber-300/80 border border-amber-500/30">
+                Alt+S
+              </kbd>
+            </button>
+
+            <button
+              onClick={() => onSelectTab('chat')}
+              title="Assistant IA RAG (Alt+A)"
+              className="flex items-center gap-2 px-3 py-2 rounded-xl bg-purple-500/15 hover:bg-purple-500/25 border border-purple-500/30 text-purple-300 text-xs font-semibold transition-all hover:scale-105 active:scale-95 cursor-pointer shadow-sm"
+            >
+              <Bot className="w-3.5 h-3.5 text-purple-400" />
+              <span>Assistant IA</span>
+              <kbd className="hidden sm:inline-block px-1.5 py-0.5 rounded text-[10px] font-mono bg-slate-950/80 text-purple-300/80 border border-purple-500/30">
+                Alt+A
+              </kbd>
+            </button>
+
+            <button
+              onClick={() => setIsQuickAccessOpen(false)}
+              className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-colors text-xs"
+              title="Réduire l'accès rapide"
+            >
+              ✕
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={() => setIsQuickAccessOpen(true)}
+            className="flex items-center gap-2 px-3.5 py-2.5 rounded-2xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs shadow-xl transition-all hover:scale-105 active:scale-95 cursor-pointer"
+            title="Ouvrir l'accès rapide IA & Recherche"
+          >
+            <Zap className="w-4 h-4 fill-slate-950" />
+            <span>Accès Rapide</span>
+          </button>
+        )}
       </div>
     </div>
   );

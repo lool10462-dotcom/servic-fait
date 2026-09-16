@@ -45,15 +45,17 @@ export default function DocPlatformSidebar({
       id: 'search',
       label: 'Recherche Sémantique',
       icon: Search,
-      badge: 'IA',
-      color: 'text-emerald-400'
+      badge: 'Alt+S',
+      color: 'text-emerald-400',
+      isAiTool: true
     },
     {
       id: 'chat',
       label: 'Assistant IA & RAG',
       icon: Bot,
-      badge: 'Ollama/Gemini',
-      color: 'text-purple-400'
+      badge: 'Alt+A',
+      color: 'text-purple-400',
+      isAiTool: true
     },
     {
       id: 'workspaces',
@@ -107,6 +109,8 @@ export default function DocPlatformSidebar({
                     <span className={`text-[10px] px-1.5 py-0.5 rounded-md font-mono ${
                       isActive 
                         ? 'bg-amber-500/30 text-amber-200' 
+                        : item.isAiTool
+                        ? 'bg-gradient-to-r from-purple-500/20 to-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-semibold'
                         : 'bg-white/5 text-slate-400 border border-white/5'
                     }`}>
                       {item.badge}
@@ -136,10 +140,10 @@ export default function DocPlatformSidebar({
         <div className="p-3.5 rounded-2xl bg-slate-900/60 border border-white/5 space-y-2.5">
           <div className="flex items-center justify-between text-[11px] font-semibold text-slate-300">
             <span className="flex items-center gap-1.5">
-              <Cloud className="w-3.5 h-3.5 text-blue-400" />
-              Stockage R2 Actif
+              <Database className="w-3.5 h-3.5 text-blue-400" />
+              Stockage Local Souverain
             </span>
-            <span className="text-emerald-400 font-mono text-[10px]">12.4 Go</span>
+            <span className="text-emerald-400 font-mono text-[10px]">Actif</span>
           </div>
           
           <div className="w-full bg-slate-800 rounded-full h-1.5 overflow-hidden">
@@ -149,9 +153,9 @@ export default function DocPlatformSidebar({
           <div className="flex items-center justify-between text-[10px] text-slate-400 pt-1 border-t border-white/5">
             <span className="flex items-center gap-1">
               <Database className="w-3 h-3 text-purple-400" />
-              Supabase RLS
+              ChromaDB Local
             </span>
-            <span className="text-emerald-400">Sécurisé</span>
+            <span className="text-emerald-400">Opérationnel</span>
           </div>
         </div>
       </div>
@@ -159,7 +163,7 @@ export default function DocPlatformSidebar({
       {/* Footer hint */}
       <div className="pt-4 border-t border-white/5 text-[10px] text-slate-400 flex items-center justify-between px-2">
         <span>v2.5 • RAG Hybride</span>
-        <span className="text-slate-400 font-mono">Qdrant Vector</span>
+        <span className="text-slate-400 font-mono">ChromaDB Vector</span>
       </div>
     </aside>
   );

@@ -154,7 +154,7 @@ export default function RegisterWizardModal({
       setProvisionProgress(50);
 
       setTimeout(async () => {
-        setProvisionStepLabel('Création du dossier souverain Cloudflare R2 (r2/users/{uuid}/)...');
+        setProvisionStepLabel('Initialisation de l\'arborescence locale /storage/users/{uuid}/ & ChromaDB...');
         setProvisionProgress(75);
 
         const res = await registerUser({
@@ -496,7 +496,7 @@ export default function RegisterWizardModal({
               </div>
 
               <p className="text-[10px] text-slate-400">
-                Chemin R2 Souverain : <code className="text-slate-300 font-mono">r2/users/{'{supabase_user_uuid}'}/</code>
+                Chemin Stockage Local : <code className="text-slate-300 font-mono">/storage/users/{'{user_id}'}/</code>
               </p>
             </div>
           )}

@@ -92,6 +92,7 @@ export default function LoginCodeModal({
         const otpRes = await sendOtp(userEmail, 'NEW_DEVICE');
         if (otpRes.previewOtp) setPreviewNewDeviceOtp(otpRes.previewOtp);
       } else {
+        sessionStorage.setItem('cniplc_code_login_success', 'true');
         onSuccess();
       }
     } else {

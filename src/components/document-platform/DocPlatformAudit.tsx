@@ -45,8 +45,8 @@ export default function DocPlatformAudit({ logs }: DocPlatformAuditProps) {
             <Key className="w-5 h-5" />
           </div>
           <div>
-            <div className="text-xs font-bold text-white">Chiffrement Souverain</div>
-            <div className="text-[11px] text-slate-400">AES-256 Cloudflare R2</div>
+            <div className="text-xs font-bold text-white">Stockage Souverain</div>
+            <div className="text-[11px] text-slate-400">Local &amp; ChromaDB</div>
           </div>
         </div>
 

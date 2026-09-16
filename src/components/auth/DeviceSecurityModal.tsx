@@ -220,7 +220,7 @@ export default function DeviceSecurityModal({ isOpen, onClose }: DeviceSecurityM
             }`}
           >
             <Database className="w-4 h-4" />
-            <span>Supabase &amp; Cloudflare R2</span>
+            <span>Supabase &amp; Stockage Local</span>
           </button>
         </div>
 
@@ -413,7 +413,7 @@ export default function DeviceSecurityModal({ isOpen, onClose }: DeviceSecurityM
                 <div className="flex items-center justify-between text-xs">
                   <span className="font-semibold text-slate-300 flex items-center gap-1.5">
                     <HardDrive className="w-3.5 h-3.5 text-blue-400" />
-                    Quota de stockage Cloudflare R2 dédié
+                    Quota de stockage local dédié
                   </span>
                   <span className="font-mono text-slate-400">4.8 GB / 15 GB</span>
                 </div>
@@ -421,7 +421,7 @@ export default function DeviceSecurityModal({ isOpen, onClose }: DeviceSecurityM
                   <div className="bg-gradient-to-r from-blue-500 to-indigo-500 h-2 rounded-full w-[32%]" />
                 </div>
                 <p className="text-[10px] text-slate-400 font-mono">
-                  Chemin R2 : r2/users/{user.id}/
+                  Chemin local : /storage/users/{user.id}/
                 </p>
               </div>
             </div>
@@ -478,7 +478,7 @@ export default function DeviceSecurityModal({ isOpen, onClose }: DeviceSecurityM
             </div>
           )}
 
-          {/* TAB 4: CLOUD CONFIG (Supabase & Cloudflare R2) */}
+          {/* TAB 4: CLOUD CONFIG (Supabase & Stockage Local Souverain) */}
           {activeTab === 'CLOUD_CONFIG' && (
             <div className="space-y-6 text-xs">
               {/* Introduction Card */}
@@ -488,12 +488,12 @@ export default function DeviceSecurityModal({ isOpen, onClose }: DeviceSecurityM
                     <Database className="w-4 h-4" />
                   </div>
                   <div>
-                    <h3 className="text-sm font-bold text-white">Connexion Professionnelle Supabase &amp; Cloudflare R2</h3>
-                    <p className="text-[11px] text-slate-400">Architecture hybride souveraine : Métadonnées relationnelles &amp; Stockage objet illimité</p>
+                    <h3 className="text-sm font-bold text-white">Connexion Professionnelle Supabase &amp; Stockage Local Souverain</h3>
+                    <p className="text-[11px] text-slate-400">Architecture souveraine autonome : Métadonnées relationnelles &amp; Stockage local avec indexation ChromaDB</p>
                   </div>
                 </div>
                 <p className="text-slate-300 leading-relaxed text-[11px]">
-                  Votre site est conçu selon la règle souveraine CNIPLC : les métadonnées utilisateurs et les journaux d'audit sont cloisonnés via <strong>Supabase Row Level Security (RLS)</strong>, et les documents lourds sont hébergés dans votre coffre-fort <strong>Cloudflare R2</strong> sous la clé stricte <code className="text-amber-300 font-mono">r2/users/&#123;supabase_user_uuid&#125;/...</code>.
+                  Votre site est conçu selon la règle souveraine CNIPLC : les métadonnées utilisateurs et les journaux d'audit sont cloisonnés via <strong>Supabase Row Level Security (RLS)</strong>, et les documents sont stockés en local sous l'arborescence <code className="text-amber-300 font-mono">/storage/users/&#123;user_id&#125;/...</code> avec indexation vectorielle <strong>ChromaDB</strong>.
                 </p>
               </div>
 
@@ -526,29 +526,29 @@ export default function DeviceSecurityModal({ isOpen, onClose }: DeviceSecurityM
                   </div>
                 </div>
 
-                {/* Cloudflare R2 Status */}
+                {/* Stockage Local & ChromaDB Status */}
                 <div className="p-4 rounded-2xl bg-slate-950/70 border border-white/10 space-y-2.5">
                   <div className="flex items-center justify-between">
                     <span className="font-bold text-white flex items-center gap-2">
-                      <Cloud className="w-4 h-4 text-amber-400" />
-                      Cloudflare R2 (Souverain S3)
+                      <HardDrive className="w-4 h-4 text-amber-400" />
+                      Stockage Local &amp; ChromaDB
                     </span>
                     <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
-                      Zéro Frais d'Egress
+                      100% Souverain
                     </span>
                   </div>
                   <div className="space-y-1 font-mono text-[10px] text-slate-400">
                     <div className="flex justify-between border-b border-white/5 py-1">
-                      <span>Bucket :</span>
-                      <span className="text-slate-200">cniplc-documents-prod</span>
+                      <span>Dossier Racine :</span>
+                      <span className="text-slate-200">/storage/users/&#123;user_id&#125;/</span>
                     </div>
                     <div className="flex justify-between border-b border-white/5 py-1">
-                      <span>Règle de Cloisonnement :</span>
-                      <span className="text-amber-300">r2/users/{user?.id || 'uuid'}/...</span>
+                      <span>Moteur Vectoriel :</span>
+                      <span className="text-amber-300">ChromaDB Local (512 tokens)</span>
                     </div>
                     <div className="flex justify-between py-1">
-                      <span>Assistant Documentaire :</span>
-                      <span className="text-purple-400 font-bold">NVIDIA NIM (Llama 3.2 Vision)</span>
+                      <span>Corbeille &amp; Versions :</span>
+                      <span className="text-emerald-400 font-bold">Sécurisées &amp; Restaurables</span>
                     </div>
                   </div>
                 </div>
@@ -647,31 +647,34 @@ ALTER PUBLICATION supabase_realtime ADD TABLE public.interventions, public.activ
                   </button>
                 </div>
 
-                {/* Step 2: Cloudflare R2 CORS Config */}
+                {/* Step 2: Arborescence Stockage Local Souverain */}
                 <div className="p-3.5 rounded-2xl bg-slate-950/60 border border-white/10 flex items-center justify-between gap-4">
                   <div className="min-w-0">
                     <div className="font-bold text-white text-xs flex items-center gap-2">
                       <span className="w-5 h-5 rounded-full bg-amber-500/20 text-amber-400 font-bold flex items-center justify-center text-[10px]">2</span>
-                      Configuration CORS Cloudflare R2 (JSON)
+                      Structure Stockage Local Souverain
                     </div>
                     <p className="text-[11px] text-slate-400 mt-0.5 truncate">
-                      Autorise les téléversements multi-parties directs et l'accès sécurisé depuis le navigateur.
+                      Arborescence partitionnée /storage/users/&#123;user_id&#125;/ avec corbeille, versions et ChromaDB.
                     </p>
                   </div>
                   <button
-                    onClick={() => copyToClipboard(`[
-  {
-    "AllowedOrigins": ["*"],
-    "AllowedMethods": ["GET", "PUT", "POST", "DELETE", "HEAD"],
-    "AllowedHeaders": ["*"],
-    "ExposeHeaders": ["ETag", "Content-Type", "Content-Length"],
-    "MaxAgeSeconds": 3600
-  }
-]`, 'cors')}
+                    onClick={() => copyToClipboard(`/storage
+  /users
+    /{user_id}
+      /documents
+      /images
+      /presentations
+      /spreadsheets
+      /generated
+      /exports
+      /trash
+  /shared
+  /temporary`, 'cors')}
                     className="shrink-0 px-3 py-1.5 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 text-amber-300 font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer"
                   >
                     {copiedType === 'cors' ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-                    <span>{copiedType === 'cors' ? 'Copié !' : 'Copier CORS'}</span>
+                    <span>{copiedType === 'cors' ? 'Copié !' : 'Copier Arborescence'}</span>
                   </button>
                 </div>
 
@@ -680,20 +683,15 @@ ALTER PUBLICATION supabase_realtime ADD TABLE public.interventions, public.activ
                   <div className="min-w-0">
                     <div className="font-bold text-white text-xs flex items-center gap-2">
                       <span className="w-5 h-5 rounded-full bg-blue-500/20 text-blue-400 font-bold flex items-center justify-center text-[10px]">3</span>
-                      Fichier .env Complet (Supabase, R2, NVIDIA Key)
+                      Fichier .env Souverain (Supabase &amp; NVIDIA Key)
                     </div>
                     <p className="text-[11px] text-slate-400 mt-0.5 truncate">
-                      Variables d'environnement prêtes à l'emploi incluant votre clé d'assistant IA.
+                      Variables d'environnement prêtes à l'emploi sans dépendance externe R2.
                     </p>
                   </div>
                   <button
                     onClick={() => copyToClipboard(`VITE_SUPABASE_URL=https://votre-projet.supabase.co
 VITE_SUPABASE_ANON_KEY=eyJhbGciOi...
-R2_ACCOUNT_ID=votre_account_id_cloudflare
-R2_ACCESS_KEY_ID=votre_r2_access_key
-R2_SECRET_ACCESS_KEY=votre_r2_secret_key
-R2_BUCKET_NAME=cniplc-documents-prod
-R2_PUBLIC_DOMAIN=https://documents.cniplc.dj
 NVIDIA_API_KEY=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`, 'env')}
                     className="shrink-0 px-3 py-1.5 rounded-xl bg-blue-500/15 hover:bg-blue-500/25 border border-blue-500/30 text-blue-300 font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer"
                   >

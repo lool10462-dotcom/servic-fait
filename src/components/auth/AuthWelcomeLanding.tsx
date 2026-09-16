@@ -267,7 +267,7 @@ export default function AuthWelcomeLanding({
                 <span>Cloisonnement Absolu (RLS)</span>
               </div>
               <p className="text-[11px] text-slate-400 leading-relaxed">
-                Vos documents et dossiers synchronisés sont cloisonnés dans votre bucket Cloudflare R2 souverain dédié.
+                Vos documents et dossiers synchronisés sont isolés dans votre stockage local souverain dédié avec indexation ChromaDB.
               </p>
             </div>
 

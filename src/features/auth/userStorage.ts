@@ -1,9 +1,78 @@
-import { InstitutionDocument, RagChatMessage, AuditLogEntry } from '../../types/documentPlatform';
+import { InstitutionDocument, RagChatMessage, AuditLogEntry, DocumentFolder } from '../../types/documentPlatform';
 import { INITIAL_DOCUMENTS, INITIAL_AUDIT_LOGS } from '../../data/mockDocuments';
 
 const USER_DOCS_PREFIX = 'cniplc_user_docs_';
 const USER_CHAT_PREFIX = 'cniplc_user_chat_';
 const USER_AUDIT_PREFIX = 'cniplc_user_audit_';
+const USER_FOLDERS_PREFIX = 'cniplc_user_folders_';
+
+export const DEFAULT_USER_FOLDERS: DocumentFolder[] = [
+  {
+    id: 'folder-rapports',
+    name: 'Rapports d\'Activité & Bilans',
+    parentId: null,
+    color: 'amber',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  },
+  {
+    id: 'folder-juridique',
+    name: 'Textes Juridiques & Réglementation',
+    parentId: null,
+    color: 'emerald',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  },
+  {
+    id: 'folder-enquetes',
+    name: 'Enquêtes & Déclarations Patrimoine',
+    parentId: null,
+    color: 'rose',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  },
+  {
+    id: 'folder-prevention',
+    name: 'Campagnes & Sensibilisation',
+    parentId: null,
+    color: 'blue',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  },
+  {
+    id: 'folder-rh',
+    name: 'Administration & Ressources Humaines',
+    parentId: null,
+    color: 'purple',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  }
+];
+
+export function getUserFolders(userId: string): DocumentFolder[] {
+  if (typeof window === 'undefined' || !userId) return DEFAULT_USER_FOLDERS;
+  try {
+    const key = `${USER_FOLDERS_PREFIX}${userId}`;
+    const stored = localStorage.getItem(key);
+    if (stored) {
+      return JSON.parse(stored);
+    }
+    localStorage.setItem(key, JSON.stringify(DEFAULT_USER_FOLDERS));
+    return DEFAULT_USER_FOLDERS;
+  } catch (e) {
+    console.error('Error loading user folders:', e);
+    return DEFAULT_USER_FOLDERS;
+  }
+}
+
+export function saveUserFolders(userId: string, folders: DocumentFolder[]): void {
+  if (typeof window === 'undefined' || !userId) return;
+  try {
+    localStorage.setItem(`${USER_FOLDERS_PREFIX}${userId}`, JSON.stringify(folders));
+  } catch (e) {
+    console.error('Error saving user folders:', e);
+  }
+}
 
 /**
  * Loads documents strictly isolated for the given user ID.
@@ -19,12 +88,13 @@ export function getUserDocuments(userId: string): InstitutionDocument[] {
       return JSON.parse(stored);
     }
 
-    // If first time for the default agent, initialize with initial documents with Sovereign R2 paths
+    // If first time for the default agent, initialize with initial documents with Sovereign local storage paths
     if (userId === '550e8400-e29b-41d4-a716-446655440000') {
       const initialized = INITIAL_DOCUMENTS.map(doc => ({
         ...doc,
-        // Enforce sovereign path rule #13: r2/users/{userId}/documents/{filename}
-        r2Key: `r2/users/${userId}/documents/${doc.originalFilename}`,
+        storagePath: `/storage/users/${userId}/documents/${doc.originalFilename}`,
+        r2Key: `/storage/users/${userId}/documents/${doc.originalFilename}`,
+        chromaVectorCount: doc.qdrantVectorCount || 100,
       }));
       localStorage.setItem(key, JSON.stringify(initialized));
       return initialized;
@@ -40,20 +110,23 @@ export function getUserDocuments(userId: string): InstitutionDocument[] {
       department: 'Direction Générale',
       mimeType: 'application/pdf',
       fileSize: 1048576,
-      r2Key: `r2/users/${userId}/documents/Guide_Accueil_Securite_CNIPLC.pdf`,
+      storagePath: `/storage/users/${userId}/documents/Guide_Accueil_Securite_CNIPLC.pdf`,
+      r2Key: `/storage/users/${userId}/documents/Guide_Accueil_Securite_CNIPLC.pdf`,
       fileHash: 'sha256:7f83b1657ff1fc53b92dc18148a1d65dfc2d4b1fa3d677284addd200126d9069',
+      sha256: '7f83b1657ff1fc53b92dc18148a1d65dfc2d4b1fa3d677284addd200126d9069',
       version: '1.0',
       language: 'Français',
       pageCount: 14,
       status: 'indexed',
       ocrApplied: true,
       qdrantVectorCount: 28,
+      chromaVectorCount: 28,
       uploadedAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       author: 'Commission Anti-Corruption',
       description: 'Document officiel d\'initialisation de votre coffre-fort documentaire souverain.',
       tags: ['Sécurité', 'Espace Privé', 'CNIPLC', 'Souveraineté'],
-      summarySnippet: 'Bienvenue sur votre espace documentaire souverain dédié. Vos documents, recherches et conversations sont strictement partitionnés avec chiffrement AES-256 et Row Level Security.',
+      summarySnippet: 'Bienvenue sur votre espace documentaire souverain dédié. Vos documents, recherches et conversations sont strictement partitionnés avec stockage local sécurisé et Row Level Security.',
       securityClassification: 'Confidentiel Institutionnel',
     };
 

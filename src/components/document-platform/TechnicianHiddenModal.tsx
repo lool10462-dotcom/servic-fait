@@ -163,7 +163,7 @@ export default function TechnicianHiddenModal({ isOpen, onClose }: TechnicianHid
                   </div>
                 </a>
 
-                {/* Supabase & Cloudflare R2 Cloud Setup */}
+                {/* Supabase & Stockage Local Souverain Setup */}
                 <div className="sm:col-span-2 p-4 bg-slate-950/80 border border-emerald-500/30 rounded-2xl">
                   <div 
                     onClick={() => setShowCloudConfig(!showCloudConfig)}
@@ -175,13 +175,13 @@ export default function TechnicianHiddenModal({ isOpen, onClose }: TechnicianHid
                       </div>
                       <div>
                         <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                          Connexion Cloud : Supabase &amp; Cloudflare R2
+                          Architecture Souveraine : Supabase, Stockage Local &amp; ChromaDB
                           <span className="text-[10px] bg-emerald-500/20 text-emerald-300 font-mono px-2 py-0.5 rounded-full border border-emerald-500/30">
-                            Prêt pour Production
+                            100% Autonome
                           </span>
                         </h3>
                         <p className="text-[11px] text-slate-400 mt-0.5">
-                          Scripts SQL de création des tables, configuration CORS R2 et variables d'environnement.
+                          Scripts SQL Supabase, arborescence locale /storage/users/&#123;id&#125;/ et indexation ChromaDB.
                         </p>
                       </div>
                     </div>
@@ -243,25 +243,27 @@ ALTER PUBLICATION supabase_realtime ADD TABLE public.interventions;`, 'sql-tech'
                         </div>
 
                         <div className="p-2.5 rounded-xl bg-slate-900 border border-white/5 space-y-1">
-                          <span className="text-slate-400 block font-semibold">Stockage Cloudflare R2</span>
-                          <span className="text-amber-400 font-mono text-[10px]">Bucket cniplc-documents-prod</span>
+                          <span className="text-slate-400 block font-semibold">Stockage Local &amp; ChromaDB</span>
+                          <span className="text-amber-400 font-mono text-[10px]">/storage/users/&#123;id&#125;/ (Sans R2)</span>
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
-                              copyToClipboard(`[
-  {
-    "AllowedOrigins": ["*"],
-    "AllowedMethods": ["GET", "PUT", "POST", "DELETE", "HEAD"],
-    "AllowedHeaders": ["*"],
-    "ExposeHeaders": ["ETag", "Content-Type", "Content-Length"],
-    "MaxAgeSeconds": 3600
-  }
-]`, 'cors-tech');
+                              copyToClipboard(`/storage
+  /users/{user_id}
+    /documents
+    /images
+    /presentations
+    /spreadsheets
+    /generated
+    /exports
+    /trash
+  /shared
+  /temporary`, 'cors-tech');
                             }}
                             className="mt-1 w-full py-1.5 px-2 rounded-lg bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 text-[10px] font-bold flex items-center justify-center gap-1 transition-colors"
                           >
                             {copiedType === 'cors-tech' ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
-                            <span>{copiedType === 'cors-tech' ? 'Copié !' : 'Copier Règles CORS'}</span>
+                            <span>{copiedType === 'cors-tech' ? 'Copié !' : 'Copier Arborescence'}</span>
                           </button>
                         </div>
                       </div>
@@ -275,16 +277,12 @@ ALTER PUBLICATION supabase_realtime ADD TABLE public.interventions;`, 'sql-tech'
                             e.stopPropagation();
                             copyToClipboard(`VITE_SUPABASE_URL=https://votre-projet.supabase.co
 VITE_SUPABASE_ANON_KEY=eyJhbGciOi...
-R2_ACCOUNT_ID=votre_account_id
-R2_ACCESS_KEY_ID=votre_access_key
-R2_SECRET_ACCESS_KEY=votre_secret_key
-R2_BUCKET_NAME=cniplc-documents-prod
 NVIDIA_API_KEY=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`, 'env-tech');
                           }}
                           className="py-1 px-2.5 rounded-lg bg-blue-500/15 hover:bg-blue-500/25 text-blue-300 text-[10px] font-bold flex items-center gap-1 transition-colors"
                         >
                           {copiedType === 'env-tech' ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
-                          <span>{copiedType === 'env-tech' ? 'Copié !' : 'Copier .env Complet'}</span>
+                          <span>{copiedType === 'env-tech' ? 'Copié !' : 'Copier .env Souverain'}</span>
                         </button>
                       </div>
                     </div>

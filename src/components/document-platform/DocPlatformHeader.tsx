@@ -16,7 +16,9 @@ import { useAuth } from '../../features/auth/AuthContext';
 
 interface DocPlatformHeaderProps {
   activeTab?: string;
+  previousTab?: string | null;
   onSelectTab: (tab: string) => void;
+  onQuickJumpToAi?: () => void;
   searchQuery: string;
   onSearchChange: (query: string) => void;
   onOpenSecurity?: () => void;
@@ -25,7 +27,10 @@ interface DocPlatformHeaderProps {
 }
 
 export default function DocPlatformHeader({
+  activeTab,
+  previousTab,
   onSelectTab,
+  onQuickJumpToAi,
   searchQuery,
   onSearchChange,
   onOpenSecurity,
@@ -33,37 +38,53 @@ export default function DocPlatformHeader({
   onOpenRegister
 }: DocPlatformHeaderProps) {
   const { user, isAuthenticated, logout } = useAuth();
+  const isAiActive = activeTab === 'chat' || activeTab === 'search';
+
   return (
-    <header className="sticky top-0 z-30 bg-slate-950/90 backdrop-blur-md border-b border-white/10 px-4 lg:px-8 py-3.5 transition-all">
+    <header className="sticky top-0 z-30 bg-slate-950/90 backdrop-blur-md border-b border-white/10 px-4 lg:px-8 py-3 transition-all">
       <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
-        {/* Left: Official CNIPLC Brand & Logo */}
-        <div className="flex items-center gap-3.5 shrink-0">
-          <div className="relative group cursor-pointer" onClick={() => onSelectTab('dashboard')}>
-            <div className="absolute -inset-1 bg-gradient-to-r from-amber-500/20 via-emerald-500/20 to-blue-500/20 rounded-2xl blur-sm opacity-70 group-hover:opacity-100 transition duration-300" />
-            <img 
-              src="/logo.jpeg" 
-              alt="CNIPLC Logo Officiel" 
-              className="w-11 h-11 object-contain rounded-xl border border-white/20 bg-white p-0.5 shadow-lg relative z-10" 
-            />
+        {/* Left: Official CNIPLC Brand & Logo (Large & Professionally Animated) */}
+        <div className="flex items-center gap-4 shrink-0">
+          <div 
+            className="relative group cursor-pointer" 
+            onClick={() => onSelectTab('dashboard')}
+            title="CNIPLC - Accueil du Tableau de Bord"
+          >
+            {/* Animated Ambient Aura & Glow */}
+            <div className="absolute -inset-1.5 bg-gradient-to-tr from-amber-500/40 via-emerald-500/30 to-blue-500/30 rounded-2xl blur-md opacity-80 group-hover:opacity-100 animate-pulse transition duration-500" />
+            
+            {/* Institutional Decorative Frame */}
+            <div className="relative rounded-2xl p-0.5 bg-gradient-to-b from-amber-400 via-amber-600 to-amber-900 shadow-xl shadow-amber-500/20 group-hover:scale-105 transition-transform duration-300">
+              <img 
+                src="/logo.jpeg" 
+                alt="CNIPLC Logo Officiel de la République de Djibouti" 
+                className="anim-logo w-14 h-14 sm:w-16 sm:h-16 object-contain rounded-[14px] bg-white p-1 border border-white/40 shadow-inner relative z-10 transition-all duration-300" 
+              />
+              {/* Subtle animated status badge */}
+              <span className="absolute -bottom-1 -right-1 flex h-3.5 w-3.5 z-20">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                <span className="relative inline-flex rounded-full h-3.5 w-3.5 bg-emerald-500 border-2 border-slate-950" />
+              </span>
+            </div>
           </div>
 
           <div>
             <div className="flex items-center gap-2">
-              <span className="font-extrabold text-base tracking-wider text-white font-sans">
+              <span className="font-black text-lg sm:text-xl tracking-wider text-white font-sans drop-shadow-sm">
                 CNIPLC
               </span>
-              <span className="text-[10px] uppercase font-bold tracking-widest px-2 py-0.5 rounded-md bg-amber-500/15 text-amber-300 border border-amber-500/30">
-                Plateforme IA Documentaire
+              <span className="text-[10px] uppercase font-extrabold tracking-widest px-2 py-0.5 rounded-md bg-gradient-to-r from-amber-500/20 to-emerald-500/20 text-amber-300 border border-amber-500/30 shadow-sm">
+                République de Djibouti
               </span>
             </div>
-            <p className="hidden sm:block text-[11px] text-slate-400 font-medium truncate max-w-md">
+            <p className="hidden sm:block text-[11.5px] text-slate-300 font-medium truncate max-w-md">
               Commission Nationale Indépendante pour la Prévention et la Lutte contre la Corruption
             </p>
           </div>
         </div>
 
         {/* Center: Global Instant Search */}
-        <div className="hidden md:flex flex-1 max-w-md mx-4">
+        <div className="hidden md:flex flex-1 max-w-md mx-2">
           <div className="relative w-full">
             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
             <input 
@@ -91,8 +112,28 @@ export default function DocPlatformHeader({
           </div>
         </div>
 
-        {/* Right: User Badge / Auth trigger */}
+        {/* Right: Quick Access AI shortcut + User Badge */}
         <div className="flex items-center gap-2.5">
+          {/* Quick Access Shortcut to Recherche Sémantique & Assistant IA */}
+          <button
+            onClick={onQuickJumpToAi}
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border transition-all shadow-sm cursor-pointer ${
+              isAiActive
+                ? 'bg-amber-500 text-slate-950 border-amber-400 font-bold shadow-amber-500/20'
+                : 'bg-gradient-to-r from-amber-500/20 via-purple-500/20 to-blue-500/20 hover:from-amber-500/30 hover:via-purple-500/30 hover:to-blue-500/30 border-amber-500/40 text-amber-200 hover:text-white font-semibold'
+            }`}
+            title="Raccourci Accès Rapide : Recherche Sémantique & Assistant IA (Alt+A)"
+          >
+            <Sparkles className={`w-3.5 h-3.5 ${isAiActive ? 'text-slate-950 animate-spin' : 'text-amber-400 animate-pulse'}`} />
+            <span className="hidden sm:inline text-xs">
+              {isAiActive && previousTab ? '← Retour Position' : 'Accès Rapide IA'}
+            </span>
+            <span className={`text-[10px] px-1.5 py-0.5 rounded font-mono ${
+              isAiActive ? 'bg-slate-900/30 text-slate-950 font-bold' : 'bg-black/40 text-slate-300 border border-white/10'
+            }`}>
+              Alt+A
+            </span>
+          </button>
           {isAuthenticated && user ? (
             <div className="flex items-center gap-2">
               <button

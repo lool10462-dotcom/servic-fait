@@ -221,7 +221,7 @@ export default function DocPlatformSearch({
                   </div>
                 </div>
 
-                {/* Extrait pertinent extrait par Qdrant RAG */}
+                {/* Extrait pertinent extrait par ChromaDB RAG */}
                 <div className="p-3 bg-slate-950/60 rounded-xl border border-white/5 text-xs text-slate-300 leading-relaxed font-sans">
                   <span className="text-amber-400 font-semibold mr-1.5">Extrait pertinent (Page 1-{Math.min(doc.pageCount, 4)}) :</span>
                   « {doc.summarySnippet} »

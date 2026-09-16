@@ -155,20 +155,23 @@ export default function LocalFolderSyncManager({
       department: workspace === 'direction' ? 'Direction Générale' : 'Département Spécialisé CNIPLC',
       mimeType: mimeType,
       fileSize: file.size,
-      r2Key: `r2/users/${user?.id || 'public'}/documents/${folderName ? `${folderName}/` : ''}${file.name}`,
+      storagePath: `/storage/users/${user?.id || 'public'}/documents/${folderName ? `${folderName}/` : ''}${file.name}`,
+      r2Key: `/storage/users/${user?.id || 'public'}/documents/${folderName ? `${folderName}/` : ''}${file.name}`,
       fileHash: `sha256:${Math.random().toString(36).substring(2, 12)}`,
+      sha256: `sha256:${Math.random().toString(36).substring(2, 12)}`,
       version: '1.0-synced',
       language: 'Français',
       pageCount: pageCount,
       status: 'indexed',
       ocrApplied: true,
+      chromaVectorCount: Math.max(6, Math.round(file.size / 12000)),
       qdrantVectorCount: Math.max(6, Math.round(file.size / 12000)),
       uploadedAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       author: user?.fullName || 'Agent Assermenté',
       description: `Document synchronisé automatiquement depuis le dossier local "${folderName || 'Dossier importé'}"`,
-      tags: ['Synchronisé', 'Dossier Local', fileTypeGroup.toUpperCase()],
-      summarySnippet: `Document ${file.name} ingéré avec succès, analysé via OCR et indexé dans Qdrant avec cloisonnement sécurisé.`,
+      tags: ['Synchronisé', 'Dossier Local', fileTypeGroup.toUpperCase(), 'ChromaDB'],
+      summarySnippet: `Document ${file.name} ingéré avec succès, analysé via OCR et indexé dans ChromaDB avec stockage local souverain.`,
       securityClassification: 'Confidentiel Institutionnel',
       localFolderSource: folderName,
       isLocalSynced: true,
@@ -216,7 +219,7 @@ export default function LocalFolderSyncManager({
     if (batchFiles.length === 0) return;
     setIsProcessingBatch(true);
     setBatchProgress(10);
-    setBatchStepText('1/4 Téléversement souverain vers Cloudflare R2...');
+    setBatchStepText('1/4 Enregistrement souverain dans le Stockage Local...');
 
     setTimeout(() => {
       setBatchProgress(40);
@@ -230,7 +233,7 @@ export default function LocalFolderSyncManager({
 
     setTimeout(() => {
       setBatchProgress(95);
-      setBatchStepText('4/4 Vectorisation & Indexation sécurisée Qdrant DB...');
+      setBatchStepText('4/4 Vectorisation sémantique & Indexation ChromaDB...');
     }, 2600);
 
     setTimeout(() => {
