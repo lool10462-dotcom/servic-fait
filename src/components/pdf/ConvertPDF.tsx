@@ -358,14 +358,46 @@ async function pdfToWordEditable(
             })
           );
         } else {
-          // Regular body paragraph with TextRun
+          // Regular body paragraph with granular TextRun elements to preserve inline styles
           const isBullet = /^[•\-\*]\s/.test(lineText);
+          const runs: TextRun[] = [];
+
+          line.items.forEach((item, idx) => {
+            const cleanStr = isBullet && idx === 0 ? item.str.replace(/^[•\-\*]\s+/, '') : item.str;
+            if (!cleanStr) return;
+
+            const isBold = /bold|black|heavy|b\d+/i.test(item.fontName);
+            const isItalic = /italic|oblique/i.test(item.fontName);
+            const fontSize = Math.max(18, Math.min(48, Math.round(item.height * 2)));
+
+            runs.push(
+              new TextRun({
+                text: cleanStr + (idx < line.items.length - 1 ? ' ' : ''),
+                bold: isBold,
+                italics: isItalic,
+                size: fontSize,
+                font: 'Segoe UI',
+                color: '1E293B'
+              })
+            );
+          });
+
+          // Infer alignment from X coordinate
+          let alignment: any = AlignmentType.LEFT;
+          const firstX = line.items[0]?.x || 0;
+          if (firstX > 220 && firstX < 380 && lineText.length < 50) {
+            alignment = AlignmentType.CENTER;
+          } else if (firstX >= 380 && lineText.length < 40) {
+            alignment = AlignmentType.RIGHT;
+          }
+
           docElements.push(
             new Paragraph({
               bullet: isBullet ? { level: 0 } : undefined,
-              children: [
+              alignment,
+              children: runs.length > 0 ? runs : [
                 new TextRun({
-                  text: isBullet ? lineText.replace(/^[•\-\*]\s+/, '') : lineText,
+                  text: lineText,
                   size: Math.max(20, Math.round(line.height * 1.8)),
                   font: 'Segoe UI'
                 })

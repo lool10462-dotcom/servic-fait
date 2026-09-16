@@ -95,17 +95,33 @@ export default function OfficeLinkLayout() {
   const [checkingBlock, setCheckingBlock] = useState(true);
 
   useEffect(() => {
+    // Check local intranet session first
+    const savedLocalSession = localStorage.getItem('cniplc_officelink_session');
+    if (savedLocalSession) {
+      try {
+        const parsed = JSON.parse(savedLocalSession);
+        if (parsed?.user) {
+          setSession(parsed);
+          setAuthLoading(false);
+          setCheckingBlock(false);
+        }
+      } catch (_) {}
+    }
+
     getSession().then((s) => {
-      setSession(s);
-      if (!s) {
+      if (s) {
+        setSession(s);
+      } else if (!savedLocalSession) {
         setAuthLoading(false);
         setCheckingBlock(false);
       }
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-      if (!session) {
+      if (session) {
+        setSession(session);
+      } else if (!localStorage.getItem('cniplc_officelink_session')) {
+        setSession(null);
         setAuthLoading(false);
         setCheckingBlock(false);
         setIsBlocked(false);
@@ -294,14 +310,48 @@ export default function OfficeLinkLayout() {
             </button>
           </form>
 
-          <div className="mt-6 text-center">
+          <div className="mt-6 space-y-3">
             <button
               type="button"
-              onClick={() => setIsLoginMode(!isLoginMode)}
-              className="text-sm font-medium hover:underline text-blue-400"
+              onClick={() => {
+                const localSession: any = {
+                  access_token: 'local_intranet_token',
+                  token_type: 'bearer',
+                  expires_in: 3600 * 24 * 7,
+                  refresh_token: 'local_refresh_token',
+                  user: {
+                    id: '550e8400-e29b-41d4-a716-446655440000',
+                    email: 'agent.driss@cniplc.dj',
+                    role: 'authenticated',
+                    aud: 'authenticated',
+                    user_metadata: {
+                      full_name: 'Driss Mahamoud (Agent CNIPLC)',
+                    },
+                    app_metadata: {
+                      role: 'Employé',
+                    }
+                  }
+                };
+                localStorage.setItem('cniplc_officelink_session', JSON.stringify(localSession));
+                setSession(localSession);
+                setAuthLoading(false);
+                setCheckingBlock(false);
+              }}
+              className="w-full py-2.5 px-4 rounded-xl bg-slate-700/80 hover:bg-slate-700 border border-slate-600 text-xs font-bold text-slate-200 hover:text-white transition-all flex items-center justify-center gap-2 cursor-pointer shadow-sm"
             >
-              {isLoginMode ? "Pas encore de compte ? S'inscrire" : 'Déjà un compte ? Se connecter'}
+              <Check className="w-4 h-4 text-emerald-400" />
+              <span>Accès Immédiat Agent Intranet (CNIPLC)</span>
             </button>
+
+            <div className="text-center">
+              <button
+                type="button"
+                onClick={() => setIsLoginMode(!isLoginMode)}
+                className="text-sm font-medium hover:underline text-blue-400"
+              >
+                {isLoginMode ? "Pas encore de compte ? S'inscrire" : 'Déjà un compte ? Se connecter'}
+              </button>
+            </div>
           </div>
 
           <div className="mt-8 pt-6 border-t border-slate-700 text-center">

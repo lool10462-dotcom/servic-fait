@@ -47,21 +47,38 @@ export default function AuthWelcomeLanding({
       {/* Top Brand Bar */}
       <header className="relative z-10 border-b border-white/10 px-4 sm:px-6 lg:px-12 py-4 bg-slate-950/80 backdrop-blur-md">
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-3.5">
-            <img 
-              src="/logo.jpeg" 
-              alt="CNIPLC Logo" 
-              className="w-11 h-11 object-contain rounded-xl border border-white/20 bg-white p-0.5 shadow-md"
-            />
+          {/* Left: Official CNIPLC Brand & Logo (Large & Professionally Animated) */}
+          <div className="flex items-center gap-4">
+            <div className="relative group cursor-pointer" title="CNIPLC - République de Djibouti">
+              {/* Animated Ambient Aura & Glow */}
+              <div className="absolute -inset-1.5 bg-gradient-to-tr from-amber-500/40 via-emerald-500/30 to-blue-500/30 rounded-2xl blur-md opacity-80 group-hover:opacity-100 animate-pulse transition duration-500" />
+              
+              {/* Institutional Decorative Frame */}
+              <div className="relative rounded-2xl p-0.5 bg-gradient-to-b from-amber-400 via-amber-600 to-amber-900 shadow-xl shadow-amber-500/20 group-hover:scale-105 transition-transform duration-300">
+                <img 
+                  src="/logo.jpeg" 
+                  alt="CNIPLC Logo Officiel République de Djibouti" 
+                  className="anim-logo w-14 h-14 sm:w-16 sm:h-16 object-contain rounded-[14px] bg-white p-1 border border-white/40 shadow-inner relative z-10 transition-all duration-300"
+                />
+                {/* Subtle animated status badge */}
+                <span className="absolute -bottom-1 -right-1 flex h-3.5 w-3.5 z-20">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                  <span className="relative inline-flex rounded-full h-3.5 w-3.5 bg-emerald-500 border-2 border-slate-950" />
+                </span>
+              </div>
+            </div>
+
             <div>
               <div className="flex items-center gap-2">
-                <span className="font-extrabold text-base tracking-wider text-white">CNIPLC</span>
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/30">
+                <span className="font-black text-lg sm:text-xl tracking-wider text-white font-sans drop-shadow-sm">
+                  CNIPLC
+                </span>
+                <span className="text-[10px] uppercase font-extrabold tracking-widest px-2 py-0.5 rounded-full bg-gradient-to-r from-amber-500/20 to-emerald-500/20 text-amber-300 border border-amber-500/30 shadow-sm">
                   République de Djibouti
                 </span>
               </div>
-              <p className="text-[11px] text-slate-400 font-medium">
-                Plateforme Souveraine d'Intelligence Documentaire
+              <p className="text-[11.5px] text-slate-300 font-medium">
+                Plateforme Souveraine d'Intelligence Documentaire & Archivage
               </p>
             </div>
           </div>

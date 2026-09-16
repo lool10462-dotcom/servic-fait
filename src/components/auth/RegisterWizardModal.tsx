@@ -334,9 +334,24 @@ export default function RegisterWizardModal({
               </div>
 
               {previewOtp && (
-                <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs flex items-center justify-between">
-                  <span>Code de sécurité reçu (simulation sécurisée) :</span>
-                  <strong className="text-sm font-mono tracking-widest bg-emerald-500/20 px-2 py-0.5 rounded text-white">{previewOtp}</strong>
+                <div className="p-3.5 rounded-2xl bg-gradient-to-r from-emerald-500/15 via-amber-500/15 to-emerald-500/15 border border-emerald-500/30 text-emerald-200 text-xs flex flex-col sm:flex-row items-center justify-between gap-2 shadow-sm">
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="w-4 h-4 text-amber-400 shrink-0" />
+                    <span>Code OTP de sécurité généré :</span>
+                    <strong className="text-sm font-mono tracking-widest bg-emerald-950/80 border border-emerald-500/40 px-2.5 py-0.5 rounded-lg text-emerald-300 font-bold shadow-inner">
+                      {previewOtp}
+                    </strong>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setOtpInput(previewOtp);
+                      setOtpError('');
+                    }}
+                    className="px-3 py-1 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-[11px] rounded-lg transition-all shadow cursor-pointer shrink-0"
+                  >
+                    Insérer le code
+                  </button>
                 </div>
               )}
 
