@@ -158,11 +158,50 @@ export default function PdfStudioPage() {
           <span className="px-4 py-1.5 rounded-full bg-white/10 text-white text-sm border border-white/20 backdrop-blur-sm">Traitement local</span>
           <span className="px-4 py-1.5 rounded-full bg-white/10 text-white text-sm border border-white/20 backdrop-blur-sm">Ultra rapide</span>
           <span className="px-4 py-1.5 rounded-full bg-white/10 text-white text-sm border border-white/20 backdrop-blur-sm">25 outils</span>
+          <a
+            href="https://www.ilovepdf.com/fr"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="px-4 py-1.5 rounded-full bg-amber-400 hover:bg-amber-300 text-slate-950 text-sm font-bold border border-amber-300 shadow-md transition-all flex items-center gap-1.5"
+            title="Ouvrir le service en ligne iLovePDF dans un nouvel onglet"
+          >
+            <span>Option iLovePDF.com</span>
+            <span className="text-[11px] opacity-75">↗</span>
+          </a>
         </div>
       </div>
 
       {/* Main Content */}
       <div className="flex-1 max-w-6xl mx-auto w-full px-4 -mt-10 pb-16">
+        {/* Choix utilisateur : Local vs iLovePDF */}
+        <div className="bg-white rounded-2xl p-5 mb-6 shadow-md border border-purple-100 flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="flex items-center gap-3.5">
+            <div className="w-11 h-11 rounded-xl bg-purple-50 border border-purple-200 flex items-center justify-center text-purple-700 shrink-0 font-bold text-base">
+              PDF
+            </div>
+            <div>
+              <h3 className="font-bold text-slate-800 text-sm flex items-center gap-2">
+                Liberté de Traitement : Convertisseur Intégré ou iLovePDF
+                <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-bold">Choix au clic</span>
+              </h3>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Utilisez nos outils souverains pour un traitement 100% sur votre ordinateur, ou cliquez pour basculer directement vers <strong>iLovePDF.com</strong> si vous préférez leurs serveurs en ligne.
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <a
+              href="https://www.ilovepdf.com/fr"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white text-xs font-bold shadow-sm transition-all"
+            >
+              <span>Accéder à iLovePDF.com</span>
+              <span>↗</span>
+            </a>
+          </div>
+        </div>
+
         <div className="space-y-8">
           {tools.map((section, idx) => (
             <div key={idx} className="bg-white rounded-2xl p-8 shadow-sm border border-slate-100">

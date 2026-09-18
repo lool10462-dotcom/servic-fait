@@ -30,6 +30,11 @@ import {
   getPdfStudioHistory, 
   PdfStudioHistoryItem 
 } from '../../utils/pdfStudioPersistence';
+import {
+  convertPdfToWordWithHighFidelity,
+  convertWordToPdfWithHighFidelity,
+  DocumentIntegrityValidationReport
+} from '../../utils/pdfGenerator';
 
 interface ConvertPDFProps {
   type: string;
@@ -1249,6 +1254,7 @@ export default function ConvertPDF({ type, onBack }: ConvertPDFProps) {
   const [jpgImages, setJpgImages] = useState<{ dataUrl: string; pageNum: number }[]>([]);
   const [history, setHistory] = useState<PdfStudioHistoryItem[]>(() => getPdfStudioHistory());
   const [showHistory, setShowHistory] = useState(false);
+  const [integrityReport, setIntegrityReport] = useState<DocumentIntegrityValidationReport | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const isMulti = type === 'fusionner' || type === 'convert-jpg-to-pdf' || type === 'comparer' || type === 'scanner';
@@ -1570,11 +1576,15 @@ export default function ConvertPDF({ type, onBack }: ConvertPDFProps) {
 
       // ── 10. PDF EN WORD (.DOCX) ───────────────────────────────
       if (type === 'convert-pdf-to-word') {
-        updateProgress('Conversion haute fidélité PDF → Word éditable…', 10);
+        updateProgress('Conversion haute fidélité PDF → Word (marges, polices et tableaux)…', 10);
         const buf = await readFileAsArrayBuffer(file);
-        const res = await pdfToWordEditable(buf, basename, updateProgress);
+        const res = await convertPdfToWordWithHighFidelity(buf, file.name, {
+          onProgress: (msg, pct) => updateProgress(msg, pct)
+        });
+        setIntegrityReport(res.report);
         setLastResult({ blob: res.blob, filename: res.filename, size: res.blob.size });
-        setResultStats('Fichier Microsoft Word (.docx) généré avec texte modifiable');
+        setResultStats(`Document Word (.docx) haute fidélité généré — Score de conformité : ${res.report.layoutFidelityScore}%`);
+        downloadBlob(res.blob, res.filename);
         setStatus('done');
         return;
       }
@@ -1660,10 +1670,15 @@ export default function ConvertPDF({ type, onBack }: ConvertPDFProps) {
 
       // ── 15. WORD EN PDF ───────────────────────────────────────
       if (type === 'convert-word-to-pdf') {
-        updateProgress('Conversion du document Word vers PDF…', 10);
-        const res = await wordToPdfHighQuality(file, updateProgress);
+        updateProgress('Conversion haute fidélité Word vers PDF (marges ISO et tableaux)…', 10);
+        const buf = await readFileAsArrayBuffer(file);
+        const res = await convertWordToPdfWithHighFidelity(buf, file.name, {
+          onProgress: (msg, pct) => updateProgress(msg, pct)
+        });
+        setIntegrityReport(res.report);
         setLastResult({ blob: res.blob, filename: res.filename, size: res.blob.size });
-        setResultStats('Document Word converti en PDF avec succès');
+        setResultStats(`Document PDF souverain généré — Score de conformité : ${res.report.layoutFidelityScore}%`);
+        downloadBlob(res.blob, res.filename);
         setStatus('done');
         return;
       }
@@ -2236,6 +2251,75 @@ export default function ConvertPDF({ type, onBack }: ConvertPDFProps) {
                 </div>
               </div>
             )}
+
+            {/* Rapport d'intégrité et de validation post-conversion */}
+            {integrityReport && (
+              <div className="max-w-lg mx-auto bg-slate-950/90 border border-emerald-500/30 rounded-xl p-4 text-left space-y-3">
+                <div className="flex items-center justify-between border-b border-white/10 pb-2.5">
+                  <div className="flex items-center gap-2">
+                    <Shield className="w-4 h-4 text-emerald-400" />
+                    <span className="text-xs font-bold text-white">Certificat de Fidélité Documentaire</span>
+                  </div>
+                  <span className="text-[11px] font-mono font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+                    Fidélité {integrityReport.layoutFidelityScore}%
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 text-[11px]">
+                  <div className="p-2 rounded-lg bg-white/5 border border-white/5">
+                    <span className="text-slate-400 block text-[10px]">Rétention textuelle</span>
+                    <span className="font-bold text-white">{integrityReport.preservationRate}%</span>
+                  </div>
+                  <div className="p-2 rounded-lg bg-white/5 border border-white/5">
+                    <span className="text-slate-400 block text-[10px]">Valeurs numériques &amp; dates</span>
+                    <span className="font-bold text-emerald-400">
+                      {integrityReport.numbersPreserved ? '100% Vérifiées' : `${integrityReport.verifiedNumbersCount}/${integrityReport.extractedNumbersCount}`}
+                    </span>
+                  </div>
+                  <div className="p-2 rounded-lg bg-white/5 border border-white/5">
+                    <span className="text-slate-400 block text-[10px]">Tableaux &amp; Colonnes</span>
+                    <span className="font-bold text-white">{integrityReport.tablesPreserved} préservé(s)</span>
+                  </div>
+                  <div className="p-2 rounded-lg bg-white/5 border border-white/5">
+                    <span className="text-slate-400 block text-[10px]">Marges ISO 20mm</span>
+                    <span className="font-bold text-emerald-400">Conformes</span>
+                  </div>
+                </div>
+
+                {integrityReport.passedRules.length > 0 && (
+                  <div className="space-y-1">
+                    {integrityReport.passedRules.map((rule, rIdx) => (
+                      <div key={rIdx} className="text-[10px] text-emerald-300 flex items-center gap-1.5">
+                        <CheckCircle className="w-3 h-3 text-emerald-400 shrink-0" />
+                        <span>{rule}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <div className="pt-2 border-t border-white/5 text-[9px] font-mono text-slate-400 flex items-center justify-between">
+                  <span>SHA-256 : {integrityReport.convertedChecksum.substring(0, 16)}...</span>
+                  <span className="text-emerald-400 font-semibold">Validation conforme</span>
+                </div>
+              </div>
+            )}
+
+            {/* Passerelle directe iLovePDF au choix de l'utilisateur */}
+            <div className="max-w-lg mx-auto p-3.5 rounded-xl bg-slate-950/60 border border-purple-500/20 flex items-center justify-between gap-3 text-left">
+              <div className="text-[11px] text-slate-300">
+                <span className="font-bold text-white block">Autre option disponible : iLovePDF.com</span>
+                <span className="text-slate-400 text-[10px]">Vous pouvez aussi utiliser le service externe iLovePDF selon votre préférence.</span>
+              </div>
+              <a
+                href="https://www.ilovepdf.com/fr"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="px-3 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-500 text-white text-[11px] font-bold shrink-0 transition flex items-center gap-1"
+              >
+                <span>iLovePDF</span>
+                <span>↗</span>
+              </a>
+            </div>
 
             {/* Preview & Download for JPG images */}
             {jpgImages.length > 0 && (

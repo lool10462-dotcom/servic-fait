@@ -58,7 +58,7 @@ export default function DocPlatformHeader({
               <img 
                 src="/logo.jpeg" 
                 alt="CNIPLC Logo Officiel de la République de Djibouti" 
-                className="anim-logo w-14 h-14 sm:w-16 sm:h-16 object-contain rounded-[14px] bg-white p-1 border border-white/40 shadow-inner relative z-10 transition-all duration-300" 
+                className="anim-logo w-18 h-18 sm:w-22 sm:h-22 object-contain rounded-[14px] bg-white p-1.5 border border-white/50 shadow-inner relative z-10 transition-all duration-300 ring-2 ring-amber-400/30" 
               />
               {/* Subtle animated status badge */}
               <span className="absolute -bottom-1 -right-1 flex h-3.5 w-3.5 z-20">

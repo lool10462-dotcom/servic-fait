@@ -10,11 +10,15 @@ import {
   Copy, 
   Check, 
   Languages, 
-  RefreshCw,
-  Info,
-  BookOpen
+  RefreshCw, 
+  Info, 
+  BookOpen,
+  FlaskConical,
+  AlertTriangle,
+  FileCheck
 } from 'lucide-react';
 import { InstitutionDocument, RagChatMessage } from '../../types/documentPlatform';
+import { executeHighPrecisionRAG, RAG_TEST_SUITE, RagTestCase } from '../../features/rag/highPrecisionRagEngine';
 
 interface DocPlatformChatRAGProps {
   documents: InstitutionDocument[];
@@ -52,6 +56,11 @@ export default function DocPlatformChatRAG({
   const [isLoading, setIsLoading] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
+  // Test bench state (Points 32 to 34)
+  const [isTestBenchOpen, setIsTestBenchOpen] = useState(false);
+  const [runningTestId, setRunningTestId] = useState<string | null>(null);
+  const [testResults, setTestResults] = useState<Record<string, { passed: boolean; observedResponse: string; details: string }>>({});
+
   const chatBottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -63,6 +72,25 @@ export default function DocPlatformChatRAG({
       setInputPrompt(initialPrompt);
     }
   }, [initialPrompt]);
+
+  const handleRunTest = async (test: RagTestCase) => {
+    setRunningTestId(test.id);
+    try {
+      const result = await test.runTest(documents);
+      setTestResults(prev => ({ ...prev, [test.id]: result }));
+    } catch (err: any) {
+      setTestResults(prev => ({
+        ...prev,
+        [test.id]: {
+          passed: false,
+          observedResponse: err.message || 'Erreur d\'exécution du test',
+          details: 'Échec technique du banc d\'essai'
+        }
+      }));
+    } finally {
+      setRunningTestId(null);
+    }
+  };
 
   const handleSend = async (textToSend?: string) => {
     const text = (textToSend || inputPrompt).trim();
@@ -80,41 +108,50 @@ export default function DocPlatformChatRAG({
     setIsLoading(true);
 
     try {
-      // Call server backend /api/document-ai
-      const response = await fetch('/api/document-ai', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'rag-query',
-          query: text,
-          language: selectedLanguage,
-          availableDocuments: documents.map(d => ({
-            id: d.id,
-            title: d.title,
-            department: d.department,
-            category: d.category,
-            snippet: d.summarySnippet,
-            pageCount: d.pageCount
-          }))
-        })
-      });
+      // 1. Execute sovereign high-precision RAG analysis locally (Manifeste en 35 points)
+      const ragResult = await executeHighPrecisionRAG(text, documents, { language: selectedLanguage });
 
-      if (response.ok) {
-        const data = await response.json();
-        const aiMessage: RagChatMessage = {
-          id: `ai-${Date.now()}`,
-          sender: 'assistant',
-          content: data.answer || "Traitement terminé.",
-          timestamp: new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }),
-          sources: data.sources || []
-        };
-        setMessages(prev => [...prev, aiMessage]);
-      } else {
-        // Intelligent client-side fallback RAG synthesis if server route is starting or offline
-        const simulated = generateRAGFallback(text, documents, selectedLanguage);
-        setMessages(prev => [...prev, simulated]);
+      let content = ragResult.answer;
+      let sources = ragResult.sources.map(s => ({
+        documentId: s.documentId,
+        documentTitle: s.documentTitle,
+        page: s.page,
+        excerpt: s.exactExcerpt,
+        confidenceScore: s.confidenceScore
+      }));
+
+      // In case no documents support the question, strictly refuse to hallucinate
+      if (!ragResult.isSupportedByDocuments) {
+        content = selectedLanguage === 'ar'
+          ? "لم يتم العثور على هذه المعلومة في الوثائق المتاحة. وفقاً للبروتوكول المؤسسي المعتمد لدى الهيئة (CNIPLC)، يمنع منعاً باتاً التكهن أو تأليف بيانات غير مؤكدة."
+          : selectedLanguage === 'en'
+          ? "I cannot find this information in the available documents. Pursuant to strict CNIPLC zero-hallucination policy, unverified facts cannot be inferred."
+          : "Je ne trouve pas cette information dans les documents disponibles. Conformément au protocole de vérité documentaire de la CNIPLC, aucune donnée non sourcée ne peut être inventée.";
       }
-    } catch {
+
+      // Add numerical verification badge text if passed
+      if (ragResult.numericalVerificationPassed && ragResult.checkedNumbers.length > 0) {
+        content += selectedLanguage === 'ar'
+          ? `\n\n🔒 **التحقق العددي** : تم التحقق من مطابقة الأرقام والنسب (${ragResult.checkedNumbers.slice(0, 3).join(', ')}) مع الأصول بدقة 100%.`
+          : selectedLanguage === 'en'
+          ? `\n\n🔒 **Numerical Verification** : Exact figures (${ragResult.checkedNumbers.slice(0, 3).join(', ')}) verified against original records with 100% fidelity.`
+          : `\n\n🔒 **Fidélité Numérique** : Les chiffres cités (${ragResult.checkedNumbers.slice(0, 3).join(', ')}) ont été vérifiés et sont 100% conformes aux documents originaux.`;
+      }
+
+      if (ragResult.hasContradiction && ragResult.contradictionDetails) {
+        content = `⚠️ **Alerte de divergence documentaire** :\n${ragResult.contradictionDetails}\n\n${content}`;
+      }
+
+      const aiMessage: RagChatMessage = {
+        id: `ai-${Date.now()}`,
+        sender: 'assistant',
+        content,
+        timestamp: new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }),
+        sources
+      };
+      setMessages(prev => [...prev, aiMessage]);
+    } catch (err) {
+      // Fallback in case of local error
       const simulated = generateRAGFallback(text, documents, selectedLanguage);
       setMessages(prev => [...prev, simulated]);
     } finally {
@@ -191,35 +228,138 @@ export default function DocPlatformChatRAG({
           </div>
         </div>
 
-        {/* Language selector: STRICTLY 3 LANGUAGES (Français, English, العربية) */}
-        <div className="flex items-center gap-1.5 bg-slate-900 border border-white/10 rounded-xl p-1 text-xs">
-          <Languages className="w-3.5 h-3.5 text-slate-400 ml-1.5" />
+        <div className="flex items-center gap-2">
+          {/* Banc d'essai RAG button */}
           <button
-            onClick={() => setSelectedLanguage('fr')}
-            className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
-              selectedLanguage === 'fr' ? 'bg-amber-500 text-slate-950 font-bold shadow' : 'text-slate-400 hover:text-white'
+            onClick={() => setIsTestBenchOpen(!isTestBenchOpen)}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
+              isTestBenchOpen
+                ? 'bg-purple-500/30 text-purple-200 border-purple-400/60 shadow-lg shadow-purple-500/20'
+                : 'bg-slate-900 hover:bg-slate-850 text-slate-300 hover:text-white border-white/10'
             }`}
+            title="Ouvrir le Banc d'Essai de Conformité RAG (Manifeste en 35 points)"
           >
-            Français
+            <FlaskConical className="w-3.5 h-3.5 text-purple-400" />
+            <span className="hidden sm:inline">Banc d'Essai RAG</span>
+            <span className="text-[10px] uppercase font-mono px-1.5 py-0.2 rounded bg-purple-500/20 text-purple-300">
+              {Object.keys(testResults).length > 0 ? `${(Object.values(testResults) as Array<{ passed: boolean }>).filter(t => t.passed).length}/4 validés` : '4 tests'}
+            </span>
           </button>
-          <button
-            onClick={() => setSelectedLanguage('en')}
-            className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
-              selectedLanguage === 'en' ? 'bg-amber-500 text-slate-950 font-bold shadow' : 'text-slate-400 hover:text-white'
-            }`}
-          >
-            English
-          </button>
-          <button
-            onClick={() => setSelectedLanguage('ar')}
-            className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
-              selectedLanguage === 'ar' ? 'bg-amber-500 text-slate-950 font-bold shadow' : 'text-slate-400 hover:text-white'
-            }`}
-          >
-            العربية
-          </button>
+
+          {/* Language selector: STRICTLY 3 LANGUAGES (Français, English, العربية) */}
+          <div className="flex items-center gap-1.5 bg-slate-900 border border-white/10 rounded-xl p-1 text-xs">
+            <Languages className="w-3.5 h-3.5 text-slate-400 ml-1.5" />
+            <button
+              onClick={() => setSelectedLanguage('fr')}
+              className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
+                selectedLanguage === 'fr' ? 'bg-amber-500 text-slate-950 font-bold shadow' : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              Français
+            </button>
+            <button
+              onClick={() => setSelectedLanguage('en')}
+              className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
+                selectedLanguage === 'en' ? 'bg-amber-500 text-slate-950 font-bold shadow' : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              English
+            </button>
+            <button
+              onClick={() => setSelectedLanguage('ar')}
+              className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
+                selectedLanguage === 'ar' ? 'bg-amber-500 text-slate-950 font-bold shadow' : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              العربية
+            </button>
+          </div>
         </div>
       </div>
+
+      {/* Expandable Test Bench Panel (Manifeste RAG en 35 points) */}
+      {isTestBenchOpen && (
+        <div className="px-6 py-4 bg-slate-950 border-b border-purple-500/30 space-y-3 anim-card">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-purple-400 animate-pulse" />
+              <h3 className="text-xs font-bold text-white uppercase tracking-wider">
+                Banc d'Essai &amp; Validation RAG — Manifeste Souverain CNIPLC (Points 32 à 34)
+              </h3>
+            </div>
+            <span className="text-[11px] text-slate-400">
+              Cliquez sur un test pour éprouver l'anti-hallucination, la fidélité numérique et la traçabilité.
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {RAG_TEST_SUITE.map(test => {
+              const res = testResults[test.id];
+              const isRunning = runningTestId === test.id;
+
+              return (
+                <div 
+                  key={test.id} 
+                  className="p-3.5 rounded-2xl bg-slate-900/90 border border-white/10 hover:border-purple-500/40 transition-all flex flex-col justify-between gap-2.5"
+                >
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-xs font-bold text-white leading-tight">
+                        {test.name}
+                      </span>
+                      {res ? (
+                        res.passed ? (
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 flex items-center gap-1 shrink-0">
+                            <FileCheck className="w-3 h-3" />
+                            CONFORME
+                          </span>
+                        ) : (
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-500/20 text-red-300 border border-red-500/40 flex items-center gap-1 shrink-0">
+                            <AlertTriangle className="w-3 h-3" />
+                            NON CONFORME
+                          </span>
+                        )
+                      ) : (
+                        <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 border border-white/5 shrink-0">
+                          En attente
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-[11px] text-slate-300 leading-snug">
+                      {test.description}
+                    </p>
+                  </div>
+
+                  {res && (
+                    <div className="p-2.5 rounded-xl bg-slate-950 border border-white/5 text-[11px] space-y-1">
+                      <p className="text-slate-400 font-mono text-[10px]">
+                        Résultat observé : <span className="text-slate-200">{res.observedResponse}</span>
+                      </p>
+                      <p className="text-emerald-400 text-[10.5px] font-semibold">
+                        ✓ {res.details}
+                      </p>
+                    </div>
+                  )}
+
+                  <div className="flex items-center justify-between pt-1 border-t border-white/5">
+                    <span className="text-[10px] text-slate-400 italic font-mono truncate max-w-[200px]">
+                      « {test.query} »
+                    </span>
+                    <button
+                      onClick={() => handleRunTest(test)}
+                      disabled={isRunning}
+                      className="px-3 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-500 disabled:bg-slate-800 text-white text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shadow-sm"
+                    >
+                      {isRunning ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <FlaskConical className="w-3.5 h-3.5" />}
+                      <span>{isRunning ? 'Exécution...' : 'Lancer ce test'}</span>
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Messages Scroll Area */}
       <div className="flex-1 p-6 overflow-y-auto space-y-6">
