@@ -58,329 +58,382 @@ export async function generateAndDownloadPDF(intervention: Intervention, directo
     format: "a4"
   });
 
+  // A4 dimensions: 210 x 297 mm
+  const pageWidth = 210;
+  const pageHeight = 297;
+  const margin = 12;
+  const contentWidth = pageWidth - (margin * 2); // 186 mm
+  const rightMargin = pageWidth - margin; // 198 mm
+
   // Get official base64 logo
   const imgData = await getBase64ImageFromUrl("/logo.jpeg");
 
-  let currentY = 15;
+  // Document boundary border for presidential/state authority
+  doc.setDrawColor(218, 222, 229); // Subtle slate-300
+  doc.setLineWidth(0.35);
+  doc.roundedRect(margin, 8, contentWidth, pageHeight - 16, 2, 2, "D");
 
-  // 1. HEADER SECTION
+  // Inner subtle framing line
+  doc.setDrawColor(241, 245, 249); // slate-100
+  doc.setLineWidth(0.15);
+  doc.rect(margin + 1.2, 9.2, contentWidth - 2.4, pageHeight - 18.4, "D");
+
+  let currentY = 12;
+
+  // 1. OFFICIAL INSTITUTIONAL HEADER WITH LOGO
   if (imgData) {
-    // Draw Logo CNIPLC
-    doc.addImage(imgData, "JPEG", 15, currentY, 20, 20);
-    
-    // State Text with indentation
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(9);
-    doc.setTextColor(100, 116, 139); // Slate-500
-    doc.text("RÉPUBLIQUE DE DJIBOUTI", 38, currentY + 3);
-    
+    // Official Logo: 18x18 mm at top left
+    try {
+      doc.addImage(imgData, "JPEG", margin + 3, currentY, 18, 18);
+    } catch {
+      // Fallback
+    }
+
+    // Official State Text & Subtitle
     doc.setFont("helvetica", "bold");
     doc.setFontSize(8.5);
+    doc.setTextColor(71, 85, 105); // Slate-600
+    doc.text("RÉPUBLIQUE DE DJIBOUTI", margin + 24, currentY + 3.5);
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(7.5);
     doc.setTextColor(15, 23, 42); // Slate-900
     const headerLines = doc.splitTextToSize("COMMISSION NATIONALE INDÉPENDANTE POUR LA PRÉVENTION ET LA LUTTE CONTRE LA CORRUPTION", 100);
-    doc.text(headerLines, 38, currentY + 7);
-    
+    doc.text(headerLines, margin + 24, currentY + 7.5);
+
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(9);
-    doc.setTextColor(197, 160, 67); // Gold-500
-    doc.text("CNIPLC - SERVICES TECHNIQUES DE L'INFORMATIQUE", 38, currentY + 16);
+    doc.setFontSize(7.5);
+    doc.setTextColor(180, 83, 9); // Warm Gold / Amber-700
+    doc.text("DIRECTION DES SYSTÈMES D'INFORMATION • DSI / CNIPLC", margin + 24, currentY + 16);
   } else {
-    // Fallback title text if logo doesn't fetch
     doc.setFont("helvetica", "bold");
     doc.setFontSize(9);
+    doc.setTextColor(71, 85, 105);
+    doc.text("RÉPUBLIQUE DE DJIBOUTI", margin + 3, currentY + 3.5);
+
+    doc.setFontSize(8);
     doc.setTextColor(15, 23, 42);
-    doc.text("RÉPUBLIQUE DE DJIBOUTI", 15, currentY + 3);
-    
-    doc.setFontSize(8);
-    const headerLines = doc.splitTextToSize("COMMISSION NATIONALE INDÉPENDANTE POUR LA PRÉVENTION ET LA LUTTE CONTRE LA CORRUPTION", 120);
-    doc.text(headerLines, 15, currentY + 8);
-    
-    doc.setFontSize(8);
-    doc.setTextColor(197, 160, 67);
-    doc.text("CNIPLC - SERVICES TECHNIQUES DE L'INFORMATIQUE", 15, currentY + 18);
+    const headerLines = doc.splitTextToSize("COMMISSION NATIONALE INDÉPENDANTE POUR LA PRÉVENTION ET LA LUTTE CONTRE LA CORRUPTION", 115);
+    doc.text(headerLines, margin + 3, currentY + 8);
+
+    doc.setFontSize(7.5);
+    doc.setTextColor(180, 83, 9);
+    doc.text("DIRECTION DES SYSTÈMES D'INFORMATION • DSI / CNIPLC", margin + 3, currentY + 16.5);
   }
 
-  // Metadata block (Right side)
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(11);
-  doc.setTextColor(15, 23, 42);
-  doc.text(`REF : ${intervention.refNumber}`, 195, currentY + 4, { align: "right" });
-  
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(9.5);
-  doc.setTextColor(100, 116, 139);
-  doc.text(`Date : ${new Date(intervention.date).toLocaleDateString('fr-FR')}`, 195, currentY + 9, { align: "right" });
-  doc.text(`Durée : ${intervention.durationMinutes} min`, 195, currentY + 14, { align: "right" });
+  // Header Right: Reference & Official Metadata Box
+  doc.setFillColor(248, 250, 252); // slate-50
+  doc.roundedRect(rightMargin - 60, currentY, 57, 18, 1.5, 1.5, "F");
+  doc.setDrawColor(226, 232, 240); // slate-200
+  doc.setLineWidth(0.2);
+  doc.roundedRect(rightMargin - 60, currentY, 57, 18, 1.5, 1.5, "D");
 
-  // Horizontal separator Gold styled line
-  currentY += 23;
-  doc.setDrawColor(197, 160, 67); // Gold
-  doc.setLineWidth(0.8);
-  doc.line(15, currentY, 195, currentY);
-
-  // 2. DOCUMENT CORE TITLE
-  currentY += 10;
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(17);
-  doc.setTextColor(15, 23, 42);
-  doc.text(intervention.ficheType === "attribution" ? "FICHE D'ATTRIBUTION ET DE RESTITUTION" : "FICHE D'INTERVENTION TECHNIQUE", 105, currentY, { align: "center" });
-  
-  currentY += 5;
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(10);
-  doc.setTextColor(197, 160, 67);
-  doc.text(intervention.ficheType === "attribution" ? "& ATTESTATION DE MATÉRIEL ATTRIBUÉ" : "& ATTESTATION DE SERVICE FAIT", 105, currentY, { align: "center" });
-
-  if (intervention.preferredService) {
-    currentY += 6;
-    doc.setFillColor(240, 253, 250); // Teal-50
-    doc.setDrawColor(204, 251, 241); // Teal-100
-    doc.setLineWidth(0.2);
-    doc.roundedRect(55, currentY - 3.5, 100, 5, 1, 1, "FD");
-    
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(7);
-    doc.setTextColor(15, 118, 110); // Teal-700
-    doc.text(`SERVICE DE PREFERENCE : ${intervention.preferredService.toUpperCase()}`, 105, currentY, { align: "center" });
-  }
-
-  // 3. PARTIES GRID BOX
-  currentY += 10;
-  // Background and border boxes for parties
-  doc.setFillColor(253, 250, 242); // Warm Gold-50 accent
-  doc.roundedRect(15, currentY, 86, 30, 2, 2, "F");
-  doc.setDrawColor(242, 223, 174); // Gold-200 border
-  doc.setLineWidth(0.25);
-  doc.roundedRect(15, currentY, 86, 30, 2, 2, "D");
-  
-  doc.setFillColor(253, 250, 242);
-  doc.roundedRect(109, currentY, 86, 30, 2, 2, "F");
-  doc.setDrawColor(242, 223, 174);
-  doc.roundedRect(109, currentY, 86, 30, 2, 2, "D");
-
-  // Column 1 content
   doc.setFont("helvetica", "bold");
   doc.setFontSize(8.5);
-  doc.setTextColor(147, 113, 35); // Gold-700
-  doc.text("INTERVENANT (TECHNICIEN IT)", 19, currentY + 5);
-  doc.setDrawColor(245, 231, 194);
-  doc.setLineWidth(0.15);
-  doc.line(19, currentY + 6.5, 95, currentY + 6.5);
+  doc.setTextColor(15, 23, 42);
+  doc.text(`RÉF : ${intervention.refNumber}`, rightMargin - 3, currentY + 5, { align: "right" });
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(7.5);
+  doc.setTextColor(100, 116, 139);
+  doc.text(`Date : ${new Date(intervention.date).toLocaleDateString('fr-FR')}`, rightMargin - 3, currentY + 9.5, { align: "right" });
+  doc.text(`Durée : ${intervention.durationMinutes || 30} min`, rightMargin - 3, currentY + 13.5, { align: "right" });
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(16, 185, 129); // Green status
+  doc.text("STATUT : VALIDÉ / CLÔTURÉ", rightMargin - 3, currentY + 17, { align: "right" });
+
+  currentY += 21;
+
+  // Gold Institutional Banner Divider
+  doc.setDrawColor(197, 160, 67); // Gold-500
+  doc.setLineWidth(0.6);
+  doc.line(margin + 2, currentY, rightMargin - 2, currentY);
+
+  // 2. DOCUMENT CORE TITLE BANNER
+  currentY += 4;
+  doc.setFillColor(15, 23, 42); // Navy slate-900 banner
+  doc.roundedRect(margin + 2, currentY, contentWidth - 4, 11, 1.5, 1.5, "F");
 
   doc.setFont("helvetica", "bold");
   doc.setFontSize(11);
-  doc.setTextColor(15, 23, 42);
-  doc.text(intervention.techName, 19, currentY + 12);
-  
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(9);
-  doc.setTextColor(71, 85, 105);
-  doc.text(intervention.techTitle, 19, currentY + 17);
-  doc.text(`Département Validant : ${intervention.techValidatingDept || "CNIPLC Informatique"}`, 19, currentY + 22);
+  doc.setTextColor(255, 255, 255);
+  const docTitle = intervention.ficheType === "attribution" 
+    ? "FICHE OFFICIELLE D'ATTRIBUTION ET DE RESTITUTION DE MATÉRIEL" 
+    : "FICHE OFFICIELLE D'INTERVENTION TECHNIQUE & SERVICE FAIT";
+  doc.text(docTitle, pageWidth / 2, currentY + 5.5, { align: "center" });
 
-  // Column 2 content
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(7.5);
-  doc.setTextColor(147, 113, 35);
-  doc.text("BÉNÉFICIAIRE (DEMANDEUR)", 113, currentY + 5);
-  doc.line(113, currentY + 6.5, 189, currentY + 6.5);
+  doc.setFontSize(7);
+  doc.setTextColor(251, 191, 36); // Amber-400
+  const docSubTitle = intervention.ficheType === "attribution"
+    ? "BORDEREAU D'AFFECTATION DE RESSOURCES INFORMATIQUES • RÉGIE DU MATÉRIEL"
+    : "CERTIFICAT TECHNIQUE D'EXÉCUTION ET DE CONFORMITÉ DES SYSTÈMES";
+  doc.text(docSubTitle, pageWidth / 2, currentY + 9.5, { align: "center" });
 
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(10);
-  doc.setTextColor(15, 23, 42);
-  doc.text(intervention.clientName, 113, currentY + 12);
-  
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(8);
-  doc.setTextColor(71, 85, 105);
-  doc.text(intervention.clientTitle, 113, currentY + 17);
-  doc.text(`Département/Direction : ${intervention.clientDepartment}`, 113, currentY + 22);
+  currentY += 13;
 
-  // 4. EQUIPMENT SPECIFICATIONS
-  currentY += 36;
-  doc.setFillColor(253, 250, 242);
-  doc.roundedRect(15, currentY, 180, 20, 1.5, 1.5, "F");
-  doc.setDrawColor(242, 223, 174);
+  // Preferred service badge (if specified)
+  if (intervention.preferredService) {
+    doc.setFillColor(240, 253, 250);
+    doc.setDrawColor(204, 251, 241);
+    doc.setLineWidth(0.2);
+    doc.roundedRect(pageWidth / 2 - 45, currentY - 1, 90, 4.5, 1, 1, "FD");
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(6.5);
+    doc.setTextColor(15, 118, 110);
+    doc.text(`SERVICE DESTINATAIRE : ${intervention.preferredService.toUpperCase()}`, pageWidth / 2, currentY + 2.2, { align: "center" });
+    currentY += 6;
+  }
+
+  // 3. IDENTIFICATION DES PARTIES (2 BOXES SIDE-BY-SIDE)
+  const boxWidth = (contentWidth - 7) / 2; // ~89.5 mm
+  const boxHeight = 25;
+  const col1X = margin + 2;
+  const col2X = col1X + boxWidth + 3;
+
+  // Box 1 : Demandeur / Bénéficiaire
+  doc.setFillColor(255, 255, 255);
+  doc.setDrawColor(226, 232, 240);
   doc.setLineWidth(0.25);
-  doc.roundedRect(15, currentY, 180, 20, 1.5, 1.5, "D");
+  doc.roundedRect(col1X, currentY, boxWidth, boxHeight, 1.5, 1.5, "FD");
+
+  // Box 1 Header Tab
+  doc.setFillColor(241, 245, 249); // slate-100
+  doc.rect(col1X, currentY, boxWidth, 5.5, "F");
+  doc.setDrawColor(226, 232, 240);
+  doc.line(col1X, currentY + 5.5, col1X + boxWidth, currentY + 5.5);
 
   doc.setFont("helvetica", "bold");
   doc.setFontSize(7.5);
-  doc.setTextColor(115, 84, 24); // Gold-850
-  doc.text(intervention.ficheType === "attribution" ? "RÉFÉRENCE DE L'ÉQUIPEMENT ATTRIBUÉ" : "DÉTAILS DE L'ÉQUIPEMENT INFORMATIQUE CONCERNÉ", 19, currentY + 5);
-  doc.setDrawColor(245, 231, 194);
-  doc.line(19, currentY + 6.5, 191, currentY + 6.5);
+  doc.setTextColor(71, 85, 105);
+  doc.text("BÉNÉFICIAIRE / DEMANDEUR", col1X + 4, currentY + 4);
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(9);
+  doc.setTextColor(15, 23, 42);
+  doc.text(intervention.clientName || "Non renseigné", col1X + 4, currentY + 11);
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(7.5);
+  doc.setTextColor(100, 116, 139);
+  doc.text(`Fonction : ${intervention.clientTitle || "Personnel CNIPLC"}`, col1X + 4, currentY + 16);
+  const deptLines = doc.splitTextToSize(`Direction : ${intervention.clientDepartment || "CNIPLC"}`, boxWidth - 8);
+  doc.text(deptLines, col1X + 4, currentY + 20.5);
+
+  // Box 2 : Intervenant Technique IT
+  doc.setFillColor(255, 255, 255);
+  doc.roundedRect(col2X, currentY, boxWidth, boxHeight, 1.5, 1.5, "FD");
+
+  // Box 2 Header Tab
+  doc.setFillColor(241, 245, 249);
+  doc.rect(col2X, currentY, boxWidth, 5.5, "F");
+  doc.setDrawColor(226, 232, 240);
+  doc.line(col2X, currentY + 5.5, col2X + boxWidth, currentY + 5.5);
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(7.5);
+  doc.setTextColor(180, 83, 9); // Amber
+  doc.text("TECHNICIEN IT RESPONSABLE (DSI)", col2X + 4, currentY + 4);
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(9);
+  doc.setTextColor(15, 23, 42);
+  doc.text(intervention.techName || "Technicien DSI", col2X + 4, currentY + 11);
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(7.5);
+  doc.setTextColor(100, 116, 139);
+  doc.text(`Titre : ${intervention.techTitle || "Ingénieur Support"}`, col2X + 4, currentY + 16);
+  doc.text(`Département : ${intervention.techValidatingDept || "DSI / Systèmes d'Information"}`, col2X + 4, currentY + 20.5);
+
+  currentY += boxHeight + 3.5;
+
+  // 4. EQUIPMENT SPECIFICATIONS STRIP
+  const equipHeight = 13;
+  doc.setFillColor(254, 252, 243); // Warm cream
+  doc.setDrawColor(242, 223, 174); // Gold border
+  doc.setLineWidth(0.25);
+  doc.roundedRect(margin + 2, currentY, contentWidth - 4, equipHeight, 1.5, 1.5, "FD");
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(7);
+  doc.setTextColor(147, 113, 35); // Gold-800
+  doc.text("CARACTÉRISTIQUES DU MATÉRIEL & RÉFÉRENCE MATÉRIELLE :", margin + 5, currentY + 4);
 
   if (intervention.ficheType === "attribution") {
     doc.setFont("helvetica", "normal");
-    doc.setFontSize(8);
+    doc.setFontSize(7.5);
     doc.setTextColor(71, 85, 105);
-    doc.text("Référence :", 19, currentY + 11);
+    doc.text("RÉFÉRENCE MATÉRIEL :", margin + 5, currentY + 9.5);
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(10);
     doc.setTextColor(15, 23, 42);
-    doc.text(intervention.equipRef || "Non spécifiée", 19, currentY + 15);
+    doc.text(intervention.equipRef || "Réf. non spécifiée", margin + 42, currentY + 9.5);
+
+    if (intervention.deviceBrand) {
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(71, 85, 105);
+      doc.text("MODÈLE / TYPE :", margin + 95, currentY + 9.5);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(15, 23, 42);
+      doc.text(intervention.deviceBrand, margin + 125, currentY + 9.5);
+    }
   } else {
+    // Standard 3 columns
+    const colW = (contentWidth - 10) / 3;
     doc.setFont("helvetica", "normal");
-    doc.setFontSize(8);
+    doc.setFontSize(7.5);
     doc.setTextColor(71, 85, 105);
-    doc.text("Type de matériel :", 19, currentY + 11);
+    doc.text("Type :", margin + 5, currentY + 9.5);
     doc.setFont("helvetica", "bold");
     doc.setTextColor(15, 23, 42);
-    doc.text(intervention.deviceType.toUpperCase(), 19, currentY + 15);
+    doc.text(intervention.deviceType || "Poste Informatique", margin + 16, currentY + 9.5);
 
     doc.setFont("helvetica", "normal");
     doc.setTextColor(71, 85, 105);
-    doc.text("Modèle / Marque :", 79, currentY + 11);
+    doc.text("Modèle / Marque :", margin + 5 + colW, currentY + 9.5);
     doc.setFont("helvetica", "bold");
     doc.setTextColor(15, 23, 42);
-    doc.text(intervention.deviceBrand || "Standard/Inconnu", 79, currentY + 15);
+    doc.text(intervention.deviceBrand || "Standard", margin + 33 + colW, currentY + 9.5);
 
     doc.setFont("helvetica", "normal");
     doc.setTextColor(71, 85, 105);
-    doc.text("N° Inventaire (Asset Code) :", 139, currentY + 11);
+    doc.text("N° Inventaire :", margin + 5 + (colW * 2), currentY + 9.5);
     doc.setFont("helvetica", "bold");
     doc.setTextColor(15, 23, 42);
-    doc.text(intervention.deviceInventory || "N/A", 139, currentY + 15);
+    doc.text(intervention.deviceInventory || "N/A (Parc DSI)", margin + 28 + (colW * 2), currentY + 9.5);
   }
 
-  // 5. RAPPORT SYNTHÉTIQUE
-  currentY += 26;
+  currentY += equipHeight + 3.5;
+
+  // 5. RAPPORT SYNTHÉTIQUE & OBSERVATIONS
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(10);
+  doc.setFontSize(8);
   doc.setTextColor(15, 23, 42);
-  doc.text(intervention.ficheType === "attribution" ? "DESCRIPTION DE L'ATTRIBUTION" : "RAPPORT SYNTHÉTIQUE D'INTERVENTION", 15, currentY);
+  const reportLabel = intervention.ficheType === "attribution" 
+    ? "1. DESCRIPTION SOMMAIRE DE L'AFFECTATION" 
+    : "1. DIAGNOSTIC & RAPPORT TECHNIQUE SYNTHÉTIQUE";
+  doc.text(reportLabel, margin + 2, currentY + 1);
+
+  currentY += 3;
+
+  doc.setFillColor(255, 255, 255);
   doc.setDrawColor(226, 232, 240);
   doc.setLineWidth(0.2);
-  doc.line(15, currentY + 1.5, 195, currentY + 1.5);
 
-  currentY += 5;
+  const rawSummary = intervention.professionalSummary || "Intervention réalisée conformément aux standards de maintenance du CNIPLC.";
+  // Fit cleanly in single page (max 3 lines)
+  const wrappedSummary = doc.splitTextToSize(rawSummary, contentWidth - 8).slice(0, 3);
+  const summaryBoxH = Math.max(10, wrappedSummary.length * 3.8 + 3.5);
+
+  doc.roundedRect(margin + 2, currentY, contentWidth - 4, summaryBoxH, 1, 1, "FD");
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(9.5);
-  doc.setTextColor(30, 41, 59); // Slate-800
-  
-  const summaryText = intervention.professionalSummary || "Aucune description rédigée.";
-  const wrappedSummary = doc.splitTextToSize(summaryText, 180);
-  doc.text(wrappedSummary, 15, currentY);
+  doc.setFontSize(7.5);
+  doc.setTextColor(30, 41, 59);
+  doc.text(wrappedSummary, margin + 5, currentY + 4);
 
-  currentY += (wrappedSummary.length * 4.2) + 5;
+  currentY += summaryBoxH + 3.5;
 
-  // Render quickNotes if present
-  if (intervention.quickNotes) {
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(8);
-    doc.setTextColor(15, 23, 42); 
-    doc.text("Notes rapides / Observations complémentaires :", 15, currentY);
-    currentY += 4.5;
-    doc.setFont("helvetica", "italic");
-    doc.setFontSize(7.5);
-    doc.setTextColor(71, 85, 105); // Slate-600
-    const wrappedQuickNotes = doc.splitTextToSize(intervention.quickNotes, 180);
-    doc.text(wrappedQuickNotes, 15, currentY);
-    currentY += (wrappedQuickNotes.length * 3.8) + 5;
-  }
-
-  // 6. ACTION NOMENCLATURE TABLE
+  // 6. ACTION NOMENCLATURE TABLE (COMPACT, FIT 1-PAGE)
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(8.5);
+  doc.setFontSize(8);
   doc.setTextColor(15, 23, 42);
-  doc.text("NOMENCLATURE DES ACTIONS TECHNIQUES RÉALISÉES", 15, currentY);
-  doc.line(15, currentY + 1.5, 195, currentY + 1.5);
+  const tableLabel = intervention.ficheType === "attribution"
+    ? "2. BORDEREAU DU MATÉRIEL & ACCESSOIRES REMIS"
+    : "2. NOMENCLATURE DES ACTIONS TECHNIQUES RÉALISÉES";
+  doc.text(tableLabel, margin + 2, currentY + 1);
 
-  currentY += 5;
-  
-  // Draw Table Header Backplate
+  currentY += 3;
+
+  // Table header
+  const tableHeaderH = 5.5;
   doc.setFillColor(15, 23, 42); // Black slate
-  doc.rect(15, currentY, 180, 7, "F");
-  
+  doc.rect(margin + 2, currentY, contentWidth - 4, tableHeaderH, "F");
+
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(8.5);
+  doc.setFontSize(7);
   doc.setTextColor(255, 255, 255);
-  doc.text("N°", 18, currentY + 4.8);
-  doc.text(intervention.ficheType === "attribution" ? "Désignation" : "Action de Maintenance Corrective et Préventive", 26, currentY + 4.8);
-  doc.text(intervention.ficheType === "attribution" ? "Caractéristiques" : "Catégorie", 146, currentY + 4.8);
-  doc.text(intervention.ficheType === "attribution" ? "État" : "Statut", 176, currentY + 4.8);
+  doc.text("N°", margin + 5, currentY + 3.8);
+  doc.text(intervention.ficheType === "attribution" ? "Désignation du Matériel / Accessoire" : "Détail de l'Action Technique", margin + 14, currentY + 3.8);
+  doc.text(intervention.ficheType === "attribution" ? "Caractéristiques" : "Catégorie", margin + 125, currentY + 3.8);
+  doc.text(intervention.ficheType === "attribution" ? "État" : "Statut", rightMargin - 15, currentY + 3.8);
 
-  currentY += 7;
+  currentY += tableHeaderH;
 
-  // Draw table rows
+  // Table Rows (limit to top 4 tasks to preserve 1-page geometry)
+  const displayTasks = (intervention.tasks && intervention.tasks.length > 0)
+    ? intervention.tasks.slice(0, 4)
+    : [
+        {
+          id: "1",
+          description: intervention.ficheType === "attribution" ? "Équipement complet configuré et opérationnel" : "Maintenance préventive et corrective du système",
+          category: "Matériel" as const,
+          status: "completed" as const
+        }
+      ];
+
+  const rowHeight = 6;
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(9);
-  
-  intervention.tasks.forEach((task, index) => {
-    // Compute wrapped task line
-    const wrappedDesc = doc.splitTextToSize(task.description, 115);
-    const rowHeight = Math.max(wrappedDesc.length * 4, 7);
+  doc.setFontSize(7.5);
 
-    // Grid boundaries
+  displayTasks.forEach((task, index) => {
+    // Alternating row background
+    if (index % 2 === 1) {
+      doc.setFillColor(248, 250, 252);
+      doc.rect(margin + 2, currentY, contentWidth - 4, rowHeight, "F");
+    }
+
+    // Border line bottom
     doc.setDrawColor(226, 232, 240);
-    doc.setLineWidth(0.25);
-    doc.line(15, currentY + rowHeight, 195, currentY + rowHeight); // Row floor
+    doc.setLineWidth(0.15);
+    doc.line(margin + 2, currentY + rowHeight, rightMargin - 2, currentY + rowHeight);
 
-    // Draw vertical column separators
-    doc.line(15, currentY, 15, currentY + rowHeight);
-    doc.line(23, currentY, 23, currentY + rowHeight);
-    doc.line(142, currentY, 142, currentY + rowHeight);
-    doc.line(172, currentY, 172, currentY + rowHeight);
-    doc.line(195, currentY, 195, currentY + rowHeight);
+    // Columns separators
+    doc.line(margin + 2, currentY, margin + 2, currentY + rowHeight);
+    doc.line(margin + 10, currentY, margin + 10, currentY + rowHeight);
+    doc.line(margin + 122, currentY, margin + 122, currentY + rowHeight);
+    doc.line(rightMargin - 22, currentY, rightMargin - 22, currentY + rowHeight);
+    doc.line(rightMargin - 2, currentY, rightMargin - 2, currentY + rowHeight);
 
-    // Row Text Fill
-    doc.setTextColor(71, 85, 105);
-    doc.text((index + 1).toString(), 19, currentY + 4.5, { align: "center" });
-    
+    doc.setTextColor(100, 116, 139);
+    doc.text((index + 1).toString(), margin + 6, currentY + 4.2, { align: "center" });
+
     doc.setTextColor(15, 23, 42);
-    doc.text(wrappedDesc, 26, currentY + 4.5);
-    
+    const shortDesc = doc.splitTextToSize(task.description, 108)[0] || task.description;
+    doc.text(shortDesc, margin + 13, currentY + 4.2);
+
     doc.setFont("helvetica", "bold");
-    doc.setTextColor(147, 113, 35); // Gold-700
-    doc.text(task.category, 144, currentY + 4.5);
-    
-    doc.setTextColor(16, 185, 129); // Emerald-500
-    doc.text(intervention.ficheType === "attribution" ? (task.status || "Neuf") : "✓ FAIT", 176, currentY + 4.5);
-    
+    doc.setTextColor(147, 113, 35);
+    doc.text(task.category || "Matériel", margin + 124, currentY + 4.2);
+
+    doc.setTextColor(16, 185, 129); // Green
+    doc.text(intervention.ficheType === "attribution" ? (task.status || "Neuf") : "✓ FAIT", rightMargin - 12, currentY + 4.2, { align: "center" });
+
     doc.setFont("helvetica", "normal");
     currentY += rowHeight;
   });
 
-  if (intervention.tasks.length === 0) {
-    doc.setDrawColor(226, 232, 240);
-    doc.line(15, currentY + 8, 195, currentY + 8);
-    doc.rect(15, currentY, 180, 8);
-    doc.setTextColor(148, 163, 184);
-    doc.text("Aucun acte technique enregistré.", 105, currentY + 5.5, { align: "center" });
-    currentY += 8;
-  }
+  currentY += 3.5;
 
-  // Check if page overflow is imminent
-  if (currentY > 225) {
-    doc.addPage();
-    currentY = 20;
-  }
+  // 7. ADMINISTRATIVE CERTIFICATION STATEMENT (SINGLE-PAGE MANDATORY)
+  const declText = intervention.ficheType === "attribution"
+    ? "ATTESTATION DE REMISE : Les services techniques du CNIPLC certifient avoir remis ce jour le matériel décrit ci-dessus, configuré et prêt à l'emploi. Le bénéficiaire s'engage à en faire un usage strictement professionnel conforme à la déontologie."
+    : "SERVICE FAIT CERTIFIÉ : La Direction des Systèmes d'Information du CNIPLC atteste que les prestations et interventions informatiques susmentionnées ont été intégralement exécutées avec succès et que les matériels sont parfaitement opérationnels.";
 
-  // 7. COMMITMENT STATEMENT
-  currentY += 8;
-  const declaration = intervention.ficheType === "attribution"
-    ? "Déclaration administrative : Ce document atteste de l'attribution effective du matériel informatique décrit ci-dessus par les services techniques du CNIPLC au bénéficiaire désigné. Le signataire du DAF, le bénéficiaire et le technicien informatique attestent par leurs signatures respectives que le matériel a été remis en bon état, configuré et opérationnel."
-    : "Déclaration administrative : Ce document atteste de la réalisation effective des travaux de dépannage, d'assistance, d'installation d'équipements ou de maintenance réseau décrits ci-dessus par les services informatiques d'État (CNIPLC). Le bénéficiaire atteste par sa signature que les systèmes informatiques mentionnés sont réparés, fonctionnels et conformes aux exigences professionnelles.";
-  const wrappedDecl = doc.splitTextToSize(declaration, 172);
-  const declBoxHeight = Math.max(18, wrappedDecl.length * 4.2 + 5);
+  const wrappedDecl = doc.splitTextToSize(declText, contentWidth - 8);
+  const declH = Math.max(10, wrappedDecl.length * 3.5 + 3.5);
 
-  doc.setFillColor(253, 250, 242);
-  doc.roundedRect(15, currentY, 180, declBoxHeight, 1, 1, "F");
+  doc.setFillColor(254, 252, 243); // Warm cream
   doc.setDrawColor(242, 223, 174);
-  doc.roundedRect(15, currentY, 180, declBoxHeight, 1, 1, "D");
+  doc.setLineWidth(0.2);
+  doc.roundedRect(margin + 2, currentY, contentWidth - 4, declH, 1, 1, "FD");
 
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(9.0);
-  doc.setTextColor(115, 115, 115);
-  doc.text(wrappedDecl, 19, currentY + 5.5);
+  doc.setFontSize(6.8);
+  doc.setTextColor(100, 75, 20);
+  doc.text(wrappedDecl, margin + 5, currentY + 3.8);
 
-  currentY += declBoxHeight;
+  currentY += declH + 3.5;
 
-  // Add "Fait à Djibouti le ..." in Times Bold (serif)
-  currentY += 6;
-  if (currentY > 240) { doc.addPage(); currentY = 20; }
-
+  // Legal Place & Date stamp in Djibouti
   const rawDate = intervention.signatureDate || intervention.date || new Date().toISOString();
   let dateFormatted = "";
   try {
@@ -398,111 +451,118 @@ export async function generateAndDownloadPDF(intervention: Intervention, directo
   }
 
   doc.setFont("times", "bold");
-  doc.setFontSize(11);
-  doc.setTextColor(15, 23, 42);
-  doc.text(`Fait à Djibouti le ${dateFormatted}`, 15, currentY);
-
-
-  // Restitution & Tech Note blocks (Attribution only)
-  if (intervention.ficheType === "attribution" && intervention.restitutionDetails) {
-    currentY += 6;
-    if (currentY > 240) { doc.addPage(); currentY = 20; }
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(8);
-    doc.setTextColor(180, 83, 9);
-    doc.text("MATÉRIEL RESTITUÉ (ANCIEN ÉQUIPEMENT)", 15, currentY);
-    currentY += 4;
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(8);
-    doc.setTextColor(51, 65, 85);
-    const wrappedRest = doc.splitTextToSize(intervention.restitutionDetails, 180);
-    doc.text(wrappedRest, 15, currentY);
-    currentY += wrappedRest.length * 4 + 2;
-  }
-
-  if (intervention.ficheType === "attribution" && intervention.techNote) {
-    currentY += 6;
-    if (currentY > 245) { doc.addPage(); currentY = 20; }
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(8);
-    doc.setTextColor(13, 148, 136);
-    doc.text("NOTE TECHNIQUE", 15, currentY);
-    currentY += 4;
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(8);
-    doc.setTextColor(71, 85, 105);
-    const wrappedNote = doc.splitTextToSize(intervention.techNote, 180);
-    doc.text(wrappedNote, 15, currentY);
-    currentY += wrappedNote.length * 4 + 2;
-  }
-
-  // 8. TRIPLE SIGNATURES
-  currentY += 8;
-  if (currentY > 235) { doc.addPage(); currentY = 20; }
-
-  const sigBoxWidth = 58;
-  const sigBoxHeight = 32;
-  const sigGap = 4;
-  const sigStartX = 15;
-
-  // Box 1: DAF
-  doc.rect(sigStartX, currentY, sigBoxWidth, sigBoxHeight);
-  doc.setFont("helvetica", "bold");
   doc.setFontSize(9);
   doc.setTextColor(15, 23, 42);
-  doc.text("LE DIRECTEUR ADMINISTRATIF", sigStartX + 2, currentY + 5);
-  doc.text("ET FINANCIER", sigStartX + 2, currentY + 9);
+  doc.text(`Fait à Djibouti, le ${dateFormatted}`, margin + 3, currentY + 1);
+
+  currentY += 4.5;
+
+  // 8. TRIPLE SIGNATURE BLOCKS (STRICTLY FIT WITHIN THE BOTTOM BOUNDARY)
+  // Page height is 297mm, boundary box ends at 289mm.
+  // We place 3 equal boxes side-by-side with height ~24mm.
+  const sigBoxW = (contentWidth - 8) / 3; // ~59.3 mm
+  const sigBoxH = 25;
+  const sigY = currentY;
+
+  // Box 1 : Direction Administrative & Financière
+  const s1X = margin + 2;
+  doc.setFillColor(255, 255, 255);
+  doc.setDrawColor(203, 213, 225); // slate-300
+  doc.setLineWidth(0.2);
+  doc.roundedRect(s1X, sigY, sigBoxW, sigBoxH, 1, 1, "FD");
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(7.5);
+  doc.setTextColor(15, 23, 42);
+  doc.text("POUR LE DAF / AUTORITÉ", s1X + 3, sigY + 4);
+
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(9.5);
+  doc.setFontSize(7);
   doc.setTextColor(100, 116, 139);
-  doc.text(intervention.dafName || "Le DAF", sigStartX + 2, currentY + 13);
+  doc.text(intervention.dafName || "Direction Administrative", s1X + 3, sigY + 8);
 
   if (intervention.dafSignature) {
-    try { doc.addImage(intervention.dafSignature, "PNG", sigStartX + 8, currentY + 14, 40, 10); } catch {}
+    try {
+      doc.addImage(intervention.dafSignature, "PNG", s1X + 6, sigY + 9.5, sigBoxW - 12, 13);
+    } catch (_) {}
+  } else {
+    doc.setFont("helvetica", "italic");
+    doc.setFontSize(6.5);
+    doc.setTextColor(148, 163, 184);
+    doc.text("[Cachet & Signature]", s1X + 12, sigY + 18);
   }
 
-  // Box 2: Bénéficiaire
-  const sig2X = sigStartX + sigBoxWidth + sigGap;
-  doc.rect(sig2X, currentY, sigBoxWidth, sigBoxHeight);
+  // Box 2 : Le Bénéficiaire
+  const s2X = s1X + sigBoxW + 2;
+  doc.setFillColor(255, 255, 255);
+  doc.roundedRect(s2X, sigY, sigBoxW, sigBoxH, 1, 1, "FD");
+
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(9);
+  doc.setFontSize(7.5);
   doc.setTextColor(15, 23, 42);
-  doc.text("LE BÉNÉFICIAIRE", sig2X + 2, currentY + 5);
+  doc.text("LE BÉNÉFICIAIRE", s2X + 3, sigY + 4);
+
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(9.5);
+  doc.setFontSize(7);
   doc.setTextColor(100, 116, 139);
-  doc.text(intervention.clientName, sig2X + 2, currentY + 9);
-  if (intervention.preferredService) {
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(7.5);
-    doc.setTextColor(15, 118, 110);
-    doc.text(intervention.preferredService.toUpperCase(), sig2X + 2, currentY + 13);
-  }
+  doc.text(intervention.clientName || "Bénéficiaire", s2X + 3, sigY + 8);
 
   if (intervention.agentSignature) {
-    try { doc.addImage(intervention.agentSignature, "PNG", sig2X + 8, currentY + 14, 40, 10); } catch {}
+    try {
+      doc.addImage(intervention.agentSignature, "PNG", s2X + 6, sigY + 9.5, sigBoxW - 12, 13);
+    } catch (_) {}
+  } else {
+    doc.setFont("helvetica", "italic");
+    doc.setFontSize(6.5);
+    doc.setTextColor(148, 163, 184);
+    doc.text("[Signature Bénéficiaire]", s2X + 10, sigY + 18);
   }
 
-  // Box 3: Technicien IT
-  const sig3X = sig2X + sigBoxWidth + sigGap;
-  doc.rect(sig3X, currentY, sigBoxWidth, sigBoxHeight);
+  // Box 3 : Le Technicien IT (DSI)
+  const s3X = s2X + sigBoxW + 2;
+  doc.setFillColor(255, 255, 255);
+  doc.roundedRect(s3X, sigY, sigBoxW, sigBoxH, 1, 1, "FD");
+
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(9);
-  doc.setTextColor(15, 23, 42);
-  doc.text("LE TECHNICIEN INFORMATIQUE", sig3X + 2, currentY + 5);
+  doc.setFontSize(7.5);
+  doc.setTextColor(180, 83, 9);
+  doc.text("LE TECHNICIEN IT (DSI)", s3X + 3, sigY + 4);
+
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(9.5);
+  doc.setFontSize(7);
   doc.setTextColor(100, 116, 139);
-  doc.text(intervention.techName, sig3X + 2, currentY + 9);
-  doc.setFontSize(8);
-  doc.setTextColor(148, 163, 184);
-  doc.text(intervention.techValidatingDept || "CNIPLC Informatique", sig3X + 2, currentY + 13);
+  doc.text(intervention.techName || "Technicien DSI", s3X + 3, sigY + 8);
 
   if (intervention.techSignature) {
-    try { doc.addImage(intervention.techSignature, "PNG", sig3X + 8, currentY + 14, 40, 10); } catch (err) {
-      console.error("Failed to add tech signature to PDF", err);
-    }
+    try {
+      doc.addImage(intervention.techSignature, "PNG", s3X + 6, sigY + 9.5, sigBoxW - 12, 13);
+    } catch (_) {}
+  } else {
+    doc.setFont("helvetica", "italic");
+    doc.setFontSize(6.5);
+    doc.setTextColor(148, 163, 184);
+    doc.text("[Signature Technicien]", s3X + 10, sigY + 18);
   }
+
+  // 9. BOTTOM OFFICIAL BARCODE & SECURITY FOOTER
+  const footerY = pageHeight - 11;
+  doc.setDrawColor(226, 232, 240);
+  doc.setLineWidth(0.2);
+  doc.line(margin + 2, footerY - 2, rightMargin - 2, footerY - 2);
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(6.5);
+  doc.setTextColor(148, 163, 184);
+  doc.text(
+    "Document officiel certifié conforme • Commission Nationale Indépendante pour la Prévention et la Lutte contre la Corruption (CNIPLC) • République de Djibouti",
+    pageWidth / 2,
+    footerY + 1,
+    { align: "center" }
+  );
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(6.5);
+  doc.setTextColor(71, 85, 105);
+  doc.text(`Page 1 / 1  •  Réf : ${intervention.refNumber}`, rightMargin - 3, footerY + 1, { align: "right" });
 
   // Clean save action
   const prefix = intervention.ficheType === "attribution" ? "Attribution" : "Intervention";

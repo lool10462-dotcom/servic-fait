@@ -866,14 +866,14 @@ export default function NewInterventionForm({
             <button
               type="button"
               onClick={() => setFicheType("attribution")}
-              className={`flex-1 sm:flex-none flex items-center gap-2 px-4 py-2.5 rounded-lg text-xs font-semibold transition-all duration-200 cursor-pointer border ${
+              className={`flex-1 sm:flex-none flex items-center gap-2 px-4 py-2.5 rounded-lg text-xs font-semibold transition-all duration-200 cursor-pointer border shadow-sm ${
                 ficheType === "attribution"
                   ? isDark
-                    ? "bg-indigo-950/60 text-indigo-300 border-indigo-700/60 shadow-md shadow-indigo-900/30"
-                    : "bg-indigo-50 text-indigo-800 border-indigo-300 shadow-md shadow-indigo-100"
+                    ? "bg-indigo-950/70 text-indigo-300 border-indigo-500/70 shadow-md shadow-indigo-900/40 ring-1 ring-indigo-500/40"
+                    : "bg-indigo-50 text-indigo-900 border-indigo-400 shadow-md shadow-indigo-100 ring-1 ring-indigo-300"
                   : isDark
-                    ? "bg-slate-950/40 text-slate-400 border-slate-800 hover:border-slate-700"
-                    : "bg-slate-50 text-slate-500 border-slate-200 hover:border-slate-300"
+                    ? "bg-slate-950/40 text-slate-400 border-slate-800 hover:border-slate-700 hover:text-slate-300"
+                    : "bg-slate-50 text-slate-600 border-slate-200 hover:border-slate-300 hover:bg-slate-100/70"
               }`}
             >
               <Package className="w-4 h-4" />

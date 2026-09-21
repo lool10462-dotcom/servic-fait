@@ -52,7 +52,16 @@ export default function App({ embedded = false }: AppProps) {
   const [isLoginMode, setIsLoginMode] = useState(true);
 
   // Stored states
-  const [interventions, setInterventions] = useState<Intervention[]>([]);
+  const [interventions, setInterventions] = useState<Intervention[]>(() => {
+    try {
+      const saved = localStorage.getItem("cniplc_interventions");
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch (_) {}
+    return INITIAL_INTERVENTIONS;
+  });
   const [techProfile, setTechProfile] = useState<TechProfile>({
     name: "Technicien",
     title: "Ingénieur Support",
@@ -214,7 +223,11 @@ export default function App({ embedded = false }: AppProps) {
       if (profile) setTechProfile(profile);
     });
 
-    fetchInterventions().then(data => setInterventions(data));
+    fetchInterventions().then(data => {
+      if (Array.isArray(data) && data.length > 0) {
+        setInterventions(data);
+      }
+    });
 
     // Load Local Directory backup folder mapping from IndexedDB
     getDirectoryHandle().then(handle => {

@@ -38,6 +38,16 @@ export const TASK_CATEGORIES = [
   "Autre"
 ] as const;
 
+export const INITIAL_EMPLOYEES = [
+  { id: "emp-1", name: "M. Daher Ali", title: "Directeur de Cabinet", department: "Cabinet du Directeur" },
+  { id: "emp-2", name: "Mme Kadra Ousmane", title: "Chef de Service RH", department: "Ressources Humaines" },
+  { id: "emp-3", name: "M. Harbi Elmi", title: "Directeur Financier", department: "Finances et Budget" },
+  { id: "emp-4", name: "M. Yacin Said", title: "Directeur Administratif & Financier", department: "Finances et Budget" },
+  { id: "emp-5", name: "Mme Fatouma Ahmed", title: "Secrétaire Générale Adjointe", department: "Secrétariat Général" },
+  { id: "emp-6", name: "M. Hassan Robleh", title: "Responsable Informatique & Réseaux", department: "Systèmes d'Information (DSI)" },
+  { id: "emp-7", name: "Mme Amina Gouled", title: "Juriste Référente Investigation", department: "Affaires Juridiques" }
+];
+
 export const INITIAL_INTERVENTIONS: Intervention[] = [
   {
     id: "INT-2026-0001",
