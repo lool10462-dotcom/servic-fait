@@ -10,9 +10,11 @@ import {
   Calendar, 
   User, 
   Layers,
-  FileCheck
+  FileCheck,
+  FileDown
 } from 'lucide-react';
 import { InstitutionDocument } from '../../types/documentPlatform';
+import { exportDocumentToWord, exportDocumentToPdf } from '../../utils/documentExportUtils';
 
 interface DocPlatformDetailsModalProps {
   docItem: InstitutionDocument | null;
@@ -76,7 +78,7 @@ export default function DocPlatformDetailsModal({
             {/* Summary */}
             <div className="p-4 rounded-2xl bg-slate-950/60 border border-white/5 space-y-1.5">
               <span className="text-[10px] font-bold text-amber-400 uppercase tracking-wider block">
-                Résumé Exécutif &amp; Données Vectorisées (Qdrant)
+                Résumé Exécutif &amp; Données Vectorisées (ChromaDB)
               </span>
               <p className="text-slate-300 leading-relaxed">
                 {docItem.summarySnippet}
@@ -120,7 +122,7 @@ export default function DocPlatformDetailsModal({
             <div className="p-3.5 rounded-xl bg-slate-950/50 border border-white/5 space-y-1">
               <div className="flex items-center gap-1.5 text-slate-400 font-mono text-[10.5px]">
                 <HardDrive className="w-3.5 h-3.5 text-blue-400" />
-                <span>Sovereign Storage Path :</span>
+                <span>Chemin Local Souverain :</span>
               </div>
               <div className="text-slate-300 font-mono text-[10px] truncate">
                 {docItem.storagePath || docItem.r2Key}
@@ -149,21 +151,41 @@ export default function DocPlatformDetailsModal({
           </div>
 
           {/* Footer Actions */}
-          <div className="p-4 bg-slate-950/80 border-t border-white/10 flex items-center justify-between gap-3">
-            <button
-              onClick={() => {
-                const blob = new Blob([docItem.summarySnippet], { type: 'text/plain' });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = docItem.originalFilename;
-                a.click();
-              }}
-              className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-white font-medium border border-white/10 text-xs transition-colors cursor-pointer"
-            >
-              <Download className="w-3.5 h-3.5" />
-              <span>Télécharger le Fichier</span>
-            </button>
+          <div className="p-4 bg-slate-950/80 border-t border-white/10 flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => {
+                  const blob = new Blob([docItem.summarySnippet], { type: 'text/plain' });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement('a');
+                  a.href = url;
+                  a.download = docItem.originalFilename;
+                  a.click();
+                }}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-white font-medium border border-white/10 text-xs transition-colors cursor-pointer"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span>Télécharger</span>
+              </button>
+
+              <button
+                onClick={() => exportDocumentToWord(docItem)}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-blue-500/15 hover:bg-blue-500/25 text-blue-300 font-medium border border-blue-500/30 text-xs transition-colors cursor-pointer"
+                title="Exporter la fiche au format Word (.docx)"
+              >
+                <FileDown className="w-3.5 h-3.5 text-blue-400" />
+                <span>Fiche Word</span>
+              </button>
+
+              <button
+                onClick={() => exportDocumentToPdf(docItem)}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-red-500/15 hover:bg-red-500/25 text-red-300 font-medium border border-red-500/30 text-xs transition-colors cursor-pointer"
+                title="Exporter la fiche au format PDF"
+              >
+                <FileText className="w-3.5 h-3.5 text-red-400" />
+                <span>Fiche PDF</span>
+              </button>
+            </div>
 
             <button
               onClick={() => {

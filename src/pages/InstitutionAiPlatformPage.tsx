@@ -411,6 +411,7 @@ export default function InstitutionAiPlatformPage() {
               onDeleteDocument={handleDeleteDocument}
               onUpdateDocument={handleUpdateDocument}
               onSelectDocument={setSelectedDocForDetails}
+              onAskAiPrompt={handleAskAi}
               onPurgeDemoDocs={handlePurgeDemoDocs}
             />
           )}

@@ -34,7 +34,12 @@ import {
   Check,
   Clock,
   Layers,
-  ArchiveRestore
+  ArchiveRestore,
+  Edit3,
+  FileDown,
+  CheckSquare,
+  Square,
+  Bot
 } from 'lucide-react';
 import { 
   InstitutionDocument, 
@@ -50,6 +55,7 @@ import { useAuth } from '../../features/auth/AuthContext';
 import { storageService, buildUserR2Path } from '../../services/storageService';
 import { chromaService } from '../../services/chromaService';
 import { getUserFolders, saveUserFolders, DEFAULT_USER_FOLDERS } from '../../features/auth/userStorage';
+import { exportDocumentToWord, exportDocumentToPdf } from '../../utils/documentExportUtils';
 
 interface DocPlatformFileManagerProps {
   documents: InstitutionDocument[];
@@ -58,6 +64,7 @@ interface DocPlatformFileManagerProps {
   onDeleteDocument: (docId: string) => void;
   onUpdateDocument?: (doc: InstitutionDocument) => void;
   onSelectDocument: (doc: InstitutionDocument) => void;
+  onAskAiPrompt?: (promptText: string) => void;
   onPurgeDemoDocs?: () => void;
 }
 
@@ -68,6 +75,7 @@ export default function DocPlatformFileManager({
   onDeleteDocument,
   onUpdateDocument,
   onSelectDocument,
+  onAskAiPrompt,
   onPurgeDemoDocs
 }: DocPlatformFileManagerProps) {
   const { user } = useAuth();
@@ -80,8 +88,15 @@ export default function DocPlatformFileManager({
   const [newFolderName, setNewFolderName] = useState('');
   const [newFolderColor, setNewFolderColor] = useState('amber');
 
+  // Folder Renaming state
+  const [editingFolder, setEditingFolder] = useState<DocumentFolder | null>(null);
+  const [editingFolderName, setEditingFolderName] = useState('');
+
   // Views: 'active' or 'trash'
   const [activeView, setActiveView] = useState<'active' | 'trash'>('active');
+
+  // Multi-Selection State
+  const [selectedDocIds, setSelectedDocIds] = useState<string[]>([]);
 
   // Filter & Search
   const [filterWorkspace, setFilterWorkspace] = useState<WorkspaceId | 'all'>('all');
@@ -108,6 +123,11 @@ export default function DocPlatformFileManager({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const folderInputRef = useRef<HTMLInputElement>(null);
 
+  // Clear selections on view change
+  useEffect(() => {
+    setSelectedDocIds([]);
+  }, [activeView, selectedFolderId]);
+
   // Save folders whenever changed
   const updateFoldersState = (newFolders: DocumentFolder[]) => {
     setFolders(newFolders);
@@ -131,6 +151,20 @@ export default function DocPlatformFileManager({
     updateFoldersState(updated);
     setNewFolderName('');
     setIsNewFolderModalOpen(false);
+  };
+
+  const handleRenameFolder = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingFolder || !editingFolderName.trim()) return;
+
+    const updated = folders.map(f => 
+      f.id === editingFolder.id 
+        ? { ...f, name: editingFolderName.trim(), updatedAt: new Date().toISOString() } 
+        : f
+    );
+    updateFoldersState(updated);
+    setEditingFolder(null);
+    setEditingFolderName('');
   };
 
   // Safe Folder Deletion (Triggers Confirmation Modal)
@@ -178,6 +212,60 @@ export default function DocPlatformFileManager({
         deletedAt: undefined
       });
     }
+  };
+
+  // Multi-selection Handlers
+  const handleToggleSelectDoc = (docId: string) => {
+    setSelectedDocIds(prev => 
+      prev.includes(docId) ? prev.filter(id => id !== docId) : [...prev, docId]
+    );
+  };
+
+  const handleToggleSelectAll = (allIds: string[]) => {
+    if (selectedDocIds.length === allIds.length && allIds.length > 0) {
+      setSelectedDocIds([]);
+    } else {
+      setSelectedDocIds(allIds);
+    }
+  };
+
+  const handleBatchMoveToTrash = () => {
+    if (selectedDocIds.length === 0) return;
+    selectedDocIds.forEach(id => {
+      const doc = documents.find(d => d.id === id);
+      if (doc) handleMoveToTrash(doc);
+    });
+    setSelectedDocIds([]);
+  };
+
+  const handleBatchRestore = () => {
+    if (selectedDocIds.length === 0) return;
+    selectedDocIds.forEach(id => {
+      const doc = documents.find(d => d.id === id);
+      if (doc) handleRestoreFromTrash(doc);
+    });
+    setSelectedDocIds([]);
+  };
+
+  const handleBatchMoveToFolder = (folderId: string | null) => {
+    if (selectedDocIds.length === 0) return;
+    selectedDocIds.forEach(id => {
+      const doc = documents.find(d => d.id === id);
+      if (doc) handleMoveToFolder(doc, folderId);
+    });
+    setSelectedDocIds([]);
+  };
+
+  const handleBatchPermanentDelete = () => {
+    if (selectedDocIds.length === 0) return;
+    const targetDocs = documents.filter(d => selectedDocIds.includes(d.id));
+    const totalSize = targetDocs.reduce((acc, d) => acc + d.fileSize, 0);
+    setDeleteModalData({
+      kind: 'empty_trash',
+      count: targetDocs.length,
+      totalSize
+    });
+    setIsDeleteModalOpen(true);
   };
 
   // Safe Empty Trash (Triggers Confirmation Modal)
@@ -486,11 +574,14 @@ export default function DocPlatformFileManager({
             <div className="flex items-center gap-2">
               <h2 className="text-base font-bold text-white">Espace Documentaire Souverain</h2>
               <span className="text-[10px] bg-emerald-500/20 text-emerald-300 font-mono px-2 py-0.5 rounded border border-emerald-500/30">
-                R2 Isolé RLS
+                Stockage Local Souverain
+              </span>
+              <span className="text-[10px] bg-purple-500/20 text-purple-300 font-mono px-2 py-0.5 rounded border border-purple-500/30">
+                ChromaDB
               </span>
             </div>
             <p className="text-xs text-slate-400">
-              Chemin de stockage souverain : <code className="text-amber-300 font-mono text-[11px]">r2/users/{currentUserId.substring(0, 8)}…/documents/</code>
+              Chemin de stockage souverain : <code className="text-amber-300 font-mono text-[11px]">storage/users/{currentUserId.substring(0, 8)}…/documents/</code>
             </p>
           </div>
         </div>
@@ -667,16 +758,29 @@ export default function DocPlatformFileManager({
                     <div className="w-8 h-8 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center">
                       <Folder className="w-4 h-4" />
                     </div>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDeleteFolder(folder.id);
-                      }}
-                      className="opacity-0 group-hover:opacity-100 p-1 text-slate-400 hover:text-rose-400 transition-opacity"
-                      title="Supprimer ce dossier"
-                    >
-                      <X className="w-3 h-3" />
-                    </button>
+                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setEditingFolder(folder);
+                          setEditingFolderName(folder.name);
+                        }}
+                        className="p-1 text-slate-400 hover:text-amber-400 transition-colors"
+                        title="Renommer ce dossier"
+                      >
+                        <Edit3 className="w-3 h-3" />
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteFolder(folder.id);
+                        }}
+                        className="p-1 text-slate-400 hover:text-rose-400 transition-colors"
+                        title="Supprimer ce dossier"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </div>
                   </div>
                   <h4 className="text-xs font-bold text-white truncate">{folder.name}</h4>
                   <p className="text-[10px] text-slate-400 font-mono mt-0.5">{count} document(s)</p>
@@ -791,6 +895,15 @@ export default function DocPlatformFileManager({
           <table className="w-full text-left text-xs text-slate-300">
             <thead className="bg-slate-950/80 border-b border-white/5 text-[11px] uppercase tracking-wider text-slate-400 font-semibold">
               <tr>
+                <th className="py-3.5 px-3 w-10 text-center">
+                  <input
+                    type="checkbox"
+                    checked={displayedDocs.length > 0 && selectedDocIds.length === displayedDocs.length}
+                    onChange={() => handleToggleSelectAll(displayedDocs.map(d => d.id))}
+                    className="rounded border-white/20 bg-slate-900 text-amber-500 focus:ring-0 cursor-pointer"
+                    title="Sélectionner tous les documents"
+                  />
+                </th>
                 <th className="py-3.5 px-4">Document &amp; Version</th>
                 <th className="py-3.5 px-4">Dossier &amp; Espace</th>
                 <th className="py-3.5 px-4">Poids &amp; Pages</th>
@@ -802,7 +915,7 @@ export default function DocPlatformFileManager({
             <tbody className="divide-y divide-white/5">
               {displayedDocs.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="py-8 text-center text-slate-400">
+                  <td colSpan={7} className="py-8 text-center text-slate-400">
                     {activeView === 'trash' 
                       ? 'La corbeille est vide.' 
                       : 'Aucun document ne correspond à vos filtres.'}
@@ -816,9 +929,19 @@ export default function DocPlatformFileManager({
                   const isPpt = doc.mimeType.includes('presentation') || doc.mimeType.includes('powerpoint') || doc.originalFilename.endsWith('.pptx') || doc.originalFilename.endsWith('.ppt');
                   const isImg = doc.mimeType.startsWith('image/') || /\.(png|jpg|jpeg|webp|svg)$/i.test(doc.originalFilename);
                   const assignedFolder = folders.find(f => f.id === doc.folderId);
+                  const isSelected = selectedDocIds.includes(doc.id);
 
                   return (
-                    <tr key={doc.id} className="hover:bg-white/5 transition-colors">
+                    <tr key={doc.id} className={`hover:bg-white/5 transition-colors ${isSelected ? 'bg-amber-500/5' : ''}`}>
+                      <td className="py-3 px-3 text-center">
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => handleToggleSelectDoc(doc.id)}
+                          className="rounded border-white/20 bg-slate-900 text-amber-500 focus:ring-0 cursor-pointer"
+                        />
+                      </td>
+
                       <td className="py-3 px-4">
                         <div className="flex items-center gap-3">
                           <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
@@ -886,7 +1009,7 @@ export default function DocPlatformFileManager({
                       <td className="py-3 px-4">
                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/20">
                           <CheckCircle2 className="w-3 h-3" />
-                          {doc.qdrantVectorCount || 12} chunks
+                          {doc.chromaVectorCount || doc.qdrantVectorCount || 12} chunks
                         </span>
                       </td>
 
@@ -906,12 +1029,39 @@ export default function DocPlatformFileManager({
                         <div className="flex items-center justify-end gap-1.5">
                           {activeView === 'active' ? (
                             <>
+                              {/* Ask AI RAG */}
+                              <button
+                                onClick={() => onAskAiPrompt ? onAskAiPrompt(doc.title) : onSelectDocument(doc)}
+                                className="p-1.5 rounded-lg bg-purple-500/15 hover:bg-purple-500/30 text-purple-300 border border-purple-500/30 transition-colors cursor-pointer"
+                                title="Interroger avec l'IA RAG (NIM / Ollama)"
+                              >
+                                <Bot className="w-3.5 h-3.5" />
+                              </button>
+
+                              {/* Export Word */}
+                              <button
+                                onClick={() => exportDocumentToWord(doc)}
+                                className="p-1.5 rounded-lg bg-blue-500/10 hover:bg-blue-500/25 text-blue-400 border border-blue-500/20 transition-colors cursor-pointer"
+                                title="Exporter la fiche au format Word (.docx)"
+                              >
+                                <FileDown className="w-3.5 h-3.5" />
+                              </button>
+
+                              {/* Export PDF */}
+                              <button
+                                onClick={() => exportDocumentToPdf(doc)}
+                                className="p-1.5 rounded-lg bg-red-500/10 hover:bg-red-500/25 text-red-400 border border-red-500/20 transition-colors cursor-pointer"
+                                title="Exporter la fiche au format PDF"
+                              >
+                                <FileText className="w-3.5 h-3.5" />
+                              </button>
+
                               {/* Open in PDF Studio if PDF */}
                               {isPdf && (
                                 <a
                                   href="/pdf-studio"
                                   className="p-1.5 rounded-lg bg-purple-500/10 hover:bg-purple-500/20 text-purple-400 transition-colors"
-                                  title="Ouvrir dans PDF Studio (Word, compresser, signer...)"
+                                  title="Ouvrir dans PDF Studio"
                                 >
                                   <Sparkles className="w-3.5 h-3.5" />
                                 </a>
@@ -1005,6 +1155,127 @@ export default function DocPlatformFileManager({
         </div>
       </div>
 
+      {/* Floating Batch Action Toolbar */}
+      {selectedDocIds.length > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 bg-slate-900/95 border border-amber-500/40 text-white px-5 py-3 rounded-2xl shadow-2xl backdrop-blur-xl flex items-center gap-4">
+          <div className="flex items-center gap-2 border-r border-white/15 pr-3">
+            <CheckSquare className="w-4 h-4 text-amber-400" />
+            <span className="text-xs font-bold font-mono">
+              {selectedDocIds.length} sélectionné(s)
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2">
+            {activeView === 'active' ? (
+              <>
+                {/* Batch Move to folder */}
+                <select
+                  onChange={(e) => {
+                    handleBatchMoveToFolder(e.target.value || null);
+                    e.target.value = '';
+                  }}
+                  className="bg-slate-800 border border-white/10 text-xs rounded-xl px-2.5 py-1.5 text-slate-200 cursor-pointer"
+                  defaultValue=""
+                >
+                  <option value="" disabled>Déplacer vers...</option>
+                  <option value="">Racine principale</option>
+                  {folders.map(f => (
+                    <option key={f.id} value={f.id}>{f.name}</option>
+                  ))}
+                </select>
+
+                {/* Batch Move to Trash */}
+                <button
+                  onClick={handleBatchMoveToTrash}
+                  className="px-3 py-1.5 rounded-xl bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/30 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>Corbeille ({selectedDocIds.length})</span>
+                </button>
+              </>
+            ) : (
+              <>
+                {/* Batch Restore */}
+                <button
+                  onClick={handleBatchRestore}
+                  className="px-3 py-1.5 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/30 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                  <span>Restaurer ({selectedDocIds.length})</span>
+                </button>
+
+                {/* Batch Delete Forever */}
+                <button
+                  onClick={handleBatchPermanentDelete}
+                  className="px-3 py-1.5 rounded-xl bg-rose-500/25 hover:bg-rose-500/35 text-rose-200 border border-rose-500/40 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>Supprimer définitivement</span>
+                </button>
+              </>
+            )}
+
+            {/* Deselect all */}
+            <button
+              onClick={() => setSelectedDocIds([])}
+              className="px-2.5 py-1.5 rounded-xl hover:bg-white/10 text-slate-400 hover:text-white text-xs transition-colors cursor-pointer"
+            >
+              Annuler
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Rename Folder */}
+      {editingFolder && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
+          <div className="w-full max-w-sm bg-slate-900 border border-white/15 rounded-2xl p-5 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                <Edit3 className="w-4 h-4 text-amber-400" />
+                <span>Renommer le dossier</span>
+              </h3>
+              <button
+                onClick={() => setEditingFolder(null)}
+                className="text-slate-400 hover:text-white"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleRenameFolder} className="space-y-4">
+              <div>
+                <label className="text-xs text-slate-400 mb-1 block">Nouveau nom du dossier</label>
+                <input
+                  type="text"
+                  value={editingFolderName}
+                  onChange={(e) => setEditingFolderName(e.target.value)}
+                  className="w-full bg-slate-950 border border-white/15 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500/50"
+                  autoFocus
+                  required
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setEditingFolder(null)}
+                  className="px-3 py-1.5 rounded-xl text-xs text-slate-400 hover:text-white"
+                >
+                  Annuler
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs"
+                >
+                  Enregistrer
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* Modal: Nouveau Dossier */}
       {isNewFolderModalOpen && (
         <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
@@ -1079,7 +1350,7 @@ export default function DocPlatformFileManager({
                     </p>
                   </div>
                   <span className="text-[10px] text-emerald-400 font-mono bg-emerald-500/10 px-2 py-0.5 rounded">
-                    R2 Souverain
+                    Stockage Local
                   </span>
                 </div>
               ))}
