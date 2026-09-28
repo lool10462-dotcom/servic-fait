@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { motion } from 'motion/react';
+import React, { useState, FormEvent } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import { 
   Shield, 
   Lock, 
@@ -17,8 +17,20 @@ import {
   Layers,
   ExternalLink,
   ShieldAlert,
-  Wrench
+  Wrench,
+  Workflow,
+  Cpu,
+  FolderSync,
+  Search,
+  HardDrive,
+  Check,
+  Send,
+  Loader2,
+  Terminal,
+  FileCheck
 } from 'lucide-react';
+import MasterPromptArchitectureModal from './MasterPromptArchitectureModal';
+import DocumentIntelligenceUploader from './DocumentIntelligenceUploader';
 
 interface AuthWelcomeLandingProps {
   onCreateSpace: () => void;
@@ -35,6 +47,8 @@ export default function AuthWelcomeLanding({
   onOpenSignalement,
   onOpenTechnician
 }: AuthWelcomeLandingProps) {
+  const [isArchitectureModalOpen, setIsArchitectureModalOpen] = useState(false);
+
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-between relative overflow-hidden selection:bg-amber-500/30 selection:text-amber-200">
       {/* Background Ambient Glows */}
@@ -45,22 +59,18 @@ export default function AuthWelcomeLanding({
       </div>
 
       {/* Top Brand Bar */}
-      <header className="relative z-10 border-b border-white/10 px-4 sm:px-6 lg:px-12 py-4 bg-slate-950/80 backdrop-blur-md">
+      <header className="relative z-10 border-b border-white/10 px-4 sm:px-6 lg:px-12 py-3.5 bg-slate-950/85 backdrop-blur-md">
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
-          {/* Left: Official CNIPLC Brand & Logo (Large & Professionally Animated) */}
+          {/* Left: Official CNIPLC Brand & Logo */}
           <div className="flex items-center gap-4">
             <div className="relative group cursor-pointer" title="CNIPLC - République de Djibouti">
-              {/* Animated Ambient Aura & Glow */}
               <div className="absolute -inset-1.5 bg-gradient-to-tr from-amber-500/40 via-emerald-500/30 to-blue-500/30 rounded-2xl blur-md opacity-80 group-hover:opacity-100 animate-pulse transition duration-500" />
-              
-              {/* Institutional Decorative Frame */}
               <div className="relative rounded-2xl p-0.5 bg-gradient-to-b from-amber-400 via-amber-600 to-amber-900 shadow-xl shadow-amber-500/20 group-hover:scale-105 transition-transform duration-300">
                 <img 
                   src="/logo.jpeg" 
                   alt="CNIPLC Logo Officiel République de Djibouti" 
-                  className="anim-logo w-18 h-18 sm:w-22 sm:h-22 object-contain rounded-[14px] bg-white p-1.5 border border-white/50 shadow-inner relative z-10 transition-all duration-300 ring-2 ring-amber-400/30"
+                  className="w-16 h-16 sm:w-20 sm:h-20 object-contain rounded-[14px] bg-white p-1.5 border border-white/50 shadow-inner relative z-10"
                 />
-                {/* Subtle animated status badge */}
                 <span className="absolute -bottom-1 -right-1 flex h-3.5 w-3.5 z-20">
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
                   <span className="relative inline-flex rounded-full h-3.5 w-3.5 bg-emerald-500 border-2 border-slate-950" />
@@ -70,30 +80,39 @@ export default function AuthWelcomeLanding({
 
             <div>
               <div className="flex items-center gap-2">
-                <span className="font-black text-lg sm:text-xl tracking-wider text-white font-sans drop-shadow-sm">
+                <span className="font-black text-lg sm:text-xl tracking-wider text-white font-sans">
                   CNIPLC
                 </span>
-                <span className="text-[10px] uppercase font-extrabold tracking-widest px-2 py-0.5 rounded-full bg-gradient-to-r from-amber-500/20 to-emerald-500/20 text-amber-300 border border-amber-500/30 shadow-sm">
+                <span className="text-[10px] uppercase font-extrabold tracking-widest px-2 py-0.5 rounded-full bg-gradient-to-r from-amber-500/20 to-emerald-500/20 text-amber-300 border border-amber-500/30">
                   République de Djibouti
                 </span>
               </div>
-              <p className="text-[11.5px] text-slate-300 font-medium">
-                Plateforme Souveraine d'Intelligence Documentaire & Archivage
+              <p className="text-[11px] sm:text-xs text-slate-300 font-medium">
+                Plateforme Souveraine d'Intelligence Documentaire IA &amp; RAG
               </p>
             </div>
           </div>
 
-          {/* Quick Institutional Utilities & Auth Actions */}
+          {/* Quick Actions & Master Architecture Button */}
           <div className="flex flex-wrap items-center justify-end gap-2 sm:gap-2.5">
+            {/* Master Prompt Architecture Modal Trigger (Hidden from visitor view) */}
+            <button
+              onClick={() => setIsArchitectureModalOpen(true)}
+              className="hidden items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 text-xs font-bold text-amber-300 transition-all cursor-pointer shadow-sm hover:scale-[1.02]"
+              style={{ display: 'none' }}
+              title="Consulter le Master Prompt : 69 directives & Graphe d'états"
+            >
+              <Workflow className="w-3.5 h-3.5 text-amber-400" />
+              <span>Master Prompt (69 Points)</span>
+            </button>
+
             {/* Quick Access: Portail OfficeLink */}
             <a
               href="/officelink"
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-semibold text-slate-300 hover:text-white transition-all cursor-pointer shadow-sm"
-              title="Accéder au portail collaboratif intranet OfficeLink"
             >
               <Layers className="w-3.5 h-3.5 text-blue-400" />
-              <span className="hidden md:inline">Portail OfficeLink</span>
-              <span className="md:hidden">OfficeLink</span>
+              <span className="hidden md:inline">OfficeLink LAN</span>
               <ExternalLink className="w-3 h-3 text-slate-400" />
             </a>
 
@@ -101,24 +120,19 @@ export default function AuthWelcomeLanding({
             <a
               href="/pdf-studio"
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-semibold text-slate-300 hover:text-white transition-all cursor-pointer shadow-sm"
-              title="Ouvrir le studio officiel d'édition et signature PDF"
             >
               <FileText className="w-3.5 h-3.5 text-purple-400" />
               <span className="hidden md:inline">PDF Studio</span>
-              <span className="md:hidden">PDF</span>
               <ExternalLink className="w-3 h-3 text-slate-400" />
             </a>
 
-            {/* Quick Access: Signaler un Incident IT */}
+            {/* Incident IT button */}
             <button
               onClick={onOpenSignalement}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-red-500/15 hover:bg-red-500/25 text-red-300 border border-red-500/30 text-xs font-semibold transition-all hover:scale-[1.02] active:scale-95 cursor-pointer shadow-sm"
-              title="Déclarer une anomalie, incident réseau ou panne IT"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-red-500/15 hover:bg-red-500/25 text-red-300 border border-red-500/30 text-xs font-semibold transition-all cursor-pointer shadow-sm"
             >
               <ShieldAlert className="w-3.5 h-3.5 text-red-400" />
-              <span className="w-1.5 h-1.5 rounded-full bg-red-400 animate-ping" />
-              <span className="hidden lg:inline">Signaler un Incident IT</span>
-              <span className="lg:hidden">Signalement IT</span>
+              <span className="hidden lg:inline">Signalement IT</span>
             </button>
 
             {/* Auth Actions */}
@@ -141,35 +155,41 @@ export default function AuthWelcomeLanding({
       </header>
 
       {/* Hero Body */}
-      <main className="relative z-10 flex-1 flex flex-col items-center justify-center px-6 py-10 lg:py-16">
-        <div className="max-w-4xl w-full text-center space-y-8">
-          {/* Badge */}
+      <main className="relative z-10 flex-1 flex flex-col items-center justify-center px-4 sm:px-6 lg:px-12 py-8 sm:py-12">
+        <div className="max-w-5xl w-full text-center space-y-7">
+          {/* Official Badge from Master Prompt */}
           <motion.div
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
-            className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-slate-900/90 border border-white/15 text-slate-300 text-xs shadow-inner"
+            className="inline-flex flex-wrap items-center justify-center gap-2 px-4 py-1.5 rounded-full bg-slate-900/90 border border-amber-500/30 text-slate-300 text-xs shadow-inner"
           >
-            <Shield className="w-3.5 h-3.5 text-emerald-400" />
-            <span className="font-medium">Chiffrement Souverain AES-256 &amp; Supabase RLS</span>
+            <Shield className="w-3.5 h-3.5 text-amber-400" />
+            <span className="font-semibold text-amber-300 uppercase tracking-wider text-[11px]">
+              SYSTÈME INSTITUTIONNEL DE GESTION DOCUMENTAIRE IA
+            </span>
+            <span className="text-slate-500">•</span>
+            <span className="text-slate-400 text-[11px]">
+              Next.js + FastAPI + Supabase/PostgreSQL + ChromaDB + Watchdog + NVIDIA NIM + LangGraph
+            </span>
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
           </motion.div>
 
-          {/* Title and Subtitle */}
+          {/* EXACT MANDATED TITLE & SUBTITLE */}
           <motion.div
             initial={{ opacity: 0, y: 15 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 }}
             className="space-y-4"
           >
-            <h1 className="text-3xl sm:text-5xl lg:text-6xl font-extrabold text-white tracking-tight leading-tight">
+            <h1 className="text-3xl sm:text-5xl lg:text-6xl font-black text-white tracking-tight leading-tight">
               Bienvenue sur votre <br className="hidden sm:inline" />
               <span className="bg-gradient-to-r from-amber-200 via-amber-400 to-amber-200 bg-clip-text text-transparent">
                 espace documentaire
               </span>
             </h1>
 
-            <p className="text-base sm:text-lg text-slate-300 max-w-2xl mx-auto font-normal leading-relaxed">
-              Stockez, centralisez et exploitez vos documents officiels (PDF, Word, Excel, PowerPoint, Images) en toute sécurité avec synchronisation locale et assistant IA souverain.
+            <p className="text-sm sm:text-base lg:text-lg text-slate-300 max-w-3xl mx-auto font-normal leading-relaxed">
+              Plateforme souveraine multi-utilisateurs strictement isolée : centralisation, synchronisation automatique de dossiers locaux (Watchdog), indexation vectorielle ChromaDB et agent RAG d'élite (LangGraph &amp; NVIDIA NIM) certifié 0-hallucination.
             </p>
           </motion.div>
 
@@ -177,138 +197,155 @@ export default function AuthWelcomeLanding({
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
-            className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-2"
+            transition={{ delay: 0.15 }}
+            className="flex flex-col sm:flex-row items-center justify-center gap-3.5 pt-1"
           >
             <button
               onClick={onCreateSpace}
-              className="w-full sm:w-auto px-8 py-4 rounded-2xl bg-gradient-to-r from-amber-500 via-amber-600 to-amber-500 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-sm sm:text-base shadow-2xl shadow-amber-500/25 border border-amber-400/40 flex items-center justify-center gap-2.5 transition-all hover:scale-[1.03] active:scale-95 cursor-pointer"
+              className="w-full sm:w-auto px-7 py-3.5 rounded-2xl bg-gradient-to-r from-amber-500 via-amber-600 to-amber-500 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-sm shadow-2xl shadow-amber-500/25 border border-amber-400/40 flex items-center justify-center gap-2.5 transition-all hover:scale-[1.03] active:scale-95 cursor-pointer"
             >
-              <span>Créer mon espace</span>
+              <span>Créer mon espace privé</span>
               <ArrowRight className="w-4 h-4 text-slate-950" />
             </button>
 
             <button
               onClick={onLogin}
-              className="w-full sm:w-auto px-8 py-4 rounded-2xl bg-slate-900/90 hover:bg-slate-800 text-white font-bold text-sm sm:text-base border border-white/15 hover:border-white/30 flex items-center justify-center gap-2.5 transition-all hover:scale-[1.02] active:scale-95 cursor-pointer shadow-lg"
+              className="w-full sm:w-auto px-7 py-3.5 rounded-2xl bg-slate-900/90 hover:bg-slate-800 text-white font-bold text-sm border border-white/15 hover:border-white/30 flex items-center justify-center gap-2.5 transition-all hover:scale-[1.02] active:scale-95 cursor-pointer shadow-lg"
             >
               <KeyRound className="w-4 h-4 text-amber-400" />
               <span>Se connecter</span>
             </button>
+
+            <button
+              onClick={() => setIsArchitectureModalOpen(true)}
+              className="hidden w-full sm:w-auto px-6 py-3.5 rounded-2xl bg-white/5 hover:bg-white/10 text-amber-300 font-semibold text-sm border border-amber-500/30 items-center justify-center gap-2 transition-all hover:scale-[1.02] cursor-pointer"
+              style={{ display: 'none' }}
+            >
+              <Workflow className="w-4 h-4 text-amber-400" />
+              <span>Inspecteur Master Architecture</span>
+            </button>
           </motion.div>
 
-          {/* Dedicated Institutional Services Strip */}
+          {/* ========================================================================= */}
+          {/* SECTION : 7 CORE SERVICES LIVE STATUS (Master Prompt Section 3 & 4)      */}
+          {/* Hidden from visitor view as requested                                    */}
+          {/* ========================================================================= */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+            className="pt-2 hidden"
+            style={{ display: 'none' }}
+          >
+            <div 
+              className="hidden p-4 rounded-2xl bg-slate-900/60 border border-white/10 backdrop-blur-md text-left"
+              style={{ display: 'none' }}
+            >
+              <div className="flex items-center justify-between mb-3 border-b border-white/5 pb-2">
+                <div className="flex items-center gap-2 text-xs font-bold text-white uppercase tracking-wider">
+                  <Cpu className="w-4 h-4 text-amber-400" />
+                  <span>Architecture Souveraine Déployée (Services Opérationnels) :</span>
+                </div>
+                <span className="text-[10px] text-emerald-400 font-mono flex items-center gap-1.5 font-bold">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+                  7 / 7 Composants Actifs
+                </span>
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2 text-[11px]">
+                <div className="p-2.5 rounded-xl bg-slate-950/80 border border-white/5 space-y-0.5">
+                  <div className="flex items-center gap-1.5 text-blue-400 font-bold text-[10px]">
+                    <span className="w-1.5 h-1.5 rounded-full bg-blue-400" />
+                    <span>FastAPI</span>
+                  </div>
+                  <div className="text-white font-semibold text-xs">Python REST</div>
+                  <div className="text-[9.5px] text-slate-400">Port 8000 &amp; RLS</div>
+                </div>
+
+                <div className="p-2.5 rounded-xl bg-slate-950/80 border border-white/5 space-y-0.5">
+                  <div className="flex items-center gap-1.5 text-emerald-400 font-bold text-[10px]">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                    <span>PostgreSQL</span>
+                  </div>
+                  <div className="text-white font-semibold text-xs">Supabase DB</div>
+                  <div className="text-[9.5px] text-slate-400">Multi-utilisateurs isolés</div>
+                </div>
+
+                <div className="p-2.5 rounded-xl bg-slate-950/80 border border-white/5 space-y-0.5">
+                  <div className="flex items-center gap-1.5 text-purple-400 font-bold text-[10px]">
+                    <span className="w-1.5 h-1.5 rounded-full bg-purple-400" />
+                    <span>Local Storage</span>
+                  </div>
+                  <div className="text-white font-semibold text-xs">/storage/users/</div>
+                  <div className="text-[9.5px] text-slate-400">Zéro fuite Cloud</div>
+                </div>
+
+                <div className="p-2.5 rounded-xl bg-slate-950/80 border border-white/5 space-y-0.5">
+                  <div className="flex items-center gap-1.5 text-teal-400 font-bold text-[10px]">
+                    <span className="w-1.5 h-1.5 rounded-full bg-teal-400" />
+                    <span>ChromaDB</span>
+                  </div>
+                  <div className="text-white font-semibold text-xs">Base Vectorielle</div>
+                  <div className="text-[9.5px] text-slate-400">Chunks 1000/150</div>
+                </div>
+
+                <div className="p-2.5 rounded-xl bg-slate-950/80 border border-white/5 space-y-0.5">
+                  <div className="flex items-center gap-1.5 text-amber-400 font-bold text-[10px]">
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+                    <span>Watchdog</span>
+                  </div>
+                  <div className="text-white font-semibold text-xs">Sync Local</div>
+                  <div className="text-[9.5px] text-slate-400">Queue SHA-256</div>
+                </div>
+
+                <div className="p-2.5 rounded-xl bg-slate-950/80 border border-white/5 space-y-0.5">
+                  <div className="flex items-center gap-1.5 text-indigo-400 font-bold text-[10px]">
+                    <span className="w-1.5 h-1.5 rounded-full bg-indigo-400" />
+                    <span>LangGraph</span>
+                  </div>
+                  <div className="text-white font-semibold text-xs">State Graph</div>
+                  <div className="text-[9.5px] text-slate-400">Outils contrôlés</div>
+                </div>
+
+                <div className="p-2.5 rounded-xl bg-slate-950/80 border border-white/5 space-y-0.5 col-span-2 sm:col-span-1">
+                  <div className="flex items-center gap-1.5 text-rose-400 font-bold text-[10px]">
+                    <span className="w-1.5 h-1.5 rounded-full bg-rose-400" />
+                    <span>NVIDIA NIM</span>
+                  </div>
+                  <div className="text-white font-semibold text-xs">Llama 3.2 Vision</div>
+                  <div className="text-[9.5px] text-slate-400">Fallback Ollama</div>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+
+          {/* ========================================================================= */}
+          {/* SECTION : INTELLIGENCE DOCUMENTAIRE & COMPRÉHENSION EXÉCUTIVE IA          */}
+          {/* ========================================================================= */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.25 }}
-            className="pt-4"
+            className="pt-2 text-left"
           >
-            <div className="p-4 rounded-2xl bg-slate-900/40 border border-white/10 backdrop-blur-md">
-              <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3 flex items-center justify-center gap-2">
-                <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-                <span>Outils &amp; Services Institutionnels d'Accès Direct</span>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <a
-                  href="/officelink"
-                  className="flex items-center gap-3 p-3 rounded-xl bg-white/5 hover:bg-blue-500/10 border border-white/5 hover:border-blue-500/30 transition-all text-left group"
-                >
-                  <div className="w-9 h-9 rounded-xl bg-blue-500/15 border border-blue-500/30 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
-                    <Layers className="w-4 h-4 text-blue-400" />
-                  </div>
-                  <div className="min-w-0">
-                    <div className="text-xs font-bold text-white flex items-center gap-1">
-                      <span>Portail OfficeLink</span>
-                      <ExternalLink className="w-3 h-3 text-slate-400 group-hover:text-blue-300" />
-                    </div>
-                    <p className="text-[11px] text-slate-400 truncate">Intranet LAN &amp; Collaboration</p>
-                  </div>
-                </a>
-
-                <a
-                  href="/pdf-studio"
-                  className="flex items-center gap-3 p-3 rounded-xl bg-white/5 hover:bg-purple-500/10 border border-white/5 hover:border-purple-500/30 transition-all text-left group"
-                >
-                  <div className="w-9 h-9 rounded-xl bg-purple-500/15 border border-purple-500/30 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
-                    <FileText className="w-4 h-4 text-purple-400" />
-                  </div>
-                  <div className="min-w-0">
-                    <div className="text-xs font-bold text-white flex items-center gap-1">
-                      <span>PDF Studio</span>
-                      <ExternalLink className="w-3 h-3 text-slate-400 group-hover:text-purple-300" />
-                    </div>
-                    <p className="text-[11px] text-slate-400 truncate">Édition &amp; Signature électronique</p>
-                  </div>
-                </a>
-
-                <button
-                  onClick={onOpenSignalement}
-                  className="flex items-center gap-3 p-3 rounded-xl bg-white/5 hover:bg-red-500/10 border border-white/5 hover:border-red-500/30 transition-all text-left group cursor-pointer"
-                >
-                  <div className="w-9 h-9 rounded-xl bg-red-500/15 border border-red-500/30 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
-                    <ShieldAlert className="w-4 h-4 text-red-400" />
-                  </div>
-                  <div className="min-w-0">
-                    <div className="text-xs font-bold text-white flex items-center gap-1.5">
-                      <span>Signaler un Incident IT</span>
-                      <span className="w-2 h-2 rounded-full bg-red-400 animate-ping" />
-                    </div>
-                    <p className="text-[11px] text-slate-400 truncate">Assistance &amp; Dépannage prioritaire</p>
-                  </div>
-                </button>
-              </div>
-            </div>
+            <DocumentIntelligenceUploader />
           </motion.div>
 
-          {/* Security & Sovereign Highlights */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3 }}
-            className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 pt-4 text-left"
-          >
-            <div className="p-4 rounded-2xl bg-slate-900/60 border border-white/5 space-y-1.5 backdrop-blur-sm">
-              <div className="flex items-center gap-2 text-amber-400 font-bold text-xs">
-                <Lock className="w-4 h-4" />
-                <span>Code Personnel Sécurisé</span>
-              </div>
-              <p className="text-[11px] text-slate-400 leading-relaxed">
-                Accès rapide et ultra-sécurisé par code hashé PBKDF2 avec sel cryptographique et protection anti brute-force.
-              </p>
-            </div>
-
-            <div className="p-4 rounded-2xl bg-slate-900/60 border border-white/5 space-y-1.5 backdrop-blur-sm">
-              <div className="flex items-center gap-2 text-blue-400 font-bold text-xs">
-                <Database className="w-4 h-4" />
-                <span>Cloisonnement Absolu (RLS)</span>
-              </div>
-              <p className="text-[11px] text-slate-400 leading-relaxed">
-                Vos documents et dossiers synchronisés sont isolés dans votre stockage local souverain dédié avec indexation ChromaDB.
-              </p>
-            </div>
-
-            <div className="p-4 rounded-2xl bg-slate-900/60 border border-white/5 space-y-1.5 backdrop-blur-sm">
-              <div className="flex items-center gap-2 text-purple-400 font-bold text-xs">
-                <Bot className="w-4 h-4" />
-                <span>Assistant RAG Anti-Hallucination</span>
-              </div>
-              <p className="text-[11px] text-slate-400 leading-relaxed">
-                Recherche sémantique vectorielle et réponses factuelles strictes fondées sur vos documents indexés.
-              </p>
-            </div>
-          </motion.div>
-
-          {/* Fast testing helper */}
+          {/* Quick Demo Login Option */}
           {onQuickDemoLogin && (
-            <div className="pt-2">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.3 }}
+              className="pt-1"
+            >
               <button
                 onClick={onQuickDemoLogin}
                 className="text-xs text-slate-400 hover:text-amber-300 underline underline-offset-4 cursor-pointer transition-colors"
               >
                 Tester immédiatement avec le profil officiel CNIPLC (Driss Mahamoud Farah • Code: 123456)
               </button>
-            </div>
+            </motion.div>
           )}
         </div>
       </main>
@@ -322,6 +359,13 @@ export default function AuthWelcomeLanding({
         </div>
 
         <div className="flex items-center gap-4">
+          <button
+            onClick={() => setIsArchitectureModalOpen(true)}
+            className="hover:text-amber-300 text-slate-400 transition-colors cursor-pointer flex items-center gap-1"
+          >
+            <Workflow className="w-3 h-3 text-amber-400" />
+            <span>Master Architecture (69 Pts)</span>
+          </button>
           <a href="/officelink" className="hover:text-slate-300 transition-colors">Portail OfficeLink</a>
           <a href="/pdf-studio" className="hover:text-slate-300 transition-colors">PDF Studio</a>
           <button 
@@ -342,6 +386,12 @@ export default function AuthWelcomeLanding({
           </div>
         </div>
       </footer>
+
+      {/* Master Prompt Architecture Modal */}
+      <MasterPromptArchitectureModal
+        isOpen={isArchitectureModalOpen}
+        onClose={() => setIsArchitectureModalOpen(false)}
+      />
     </div>
   );
 }

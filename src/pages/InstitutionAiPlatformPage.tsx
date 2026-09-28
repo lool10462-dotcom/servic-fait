@@ -29,6 +29,7 @@ import AuthWelcomeLanding from '../components/auth/AuthWelcomeLanding';
 import RegisterWizardModal from '../components/auth/RegisterWizardModal';
 import LoginCodeModal from '../components/auth/LoginCodeModal';
 import DeviceSecurityModal from '../components/auth/DeviceSecurityModal';
+import MasterPromptArchitectureModal from '../components/auth/MasterPromptArchitectureModal';
 import { useAuth } from '../features/auth/AuthContext';
 import { 
   getUserDocuments, 
@@ -59,6 +60,7 @@ export default function InstitutionAiPlatformPage() {
   const [isRegisterOpen, setIsRegisterOpen] = useState<boolean>(false);
   const [isLoginOpen, setIsLoginOpen] = useState<boolean>(false);
   const [isSecurityOpen, setIsSecurityOpen] = useState<boolean>(false);
+  const [isArchitectureOpen, setIsArchitectureOpen] = useState<boolean>(false);
 
   // Check if user recently logged in with code to display quick access prompt
   useEffect(() => {
@@ -362,6 +364,7 @@ export default function InstitutionAiPlatformPage() {
           onSelectTab={handleTabChange}
           documentCount={documents.length}
           onOpenSecurity={() => setIsSecurityOpen(true)}
+          onOpenArchitecture={() => setIsArchitectureOpen(true)}
         />
 
         {/* Dynamic Center Stage */}
@@ -474,6 +477,12 @@ export default function InstitutionAiPlatformPage() {
         onAskAi={(docTitle) => {
           handleAskAi(`En te basant sur le document "${docTitle}", donne-moi une analyse détaillée.`);
         }}
+      />
+
+      {/* Master Prompt Architecture Modal (69 Directives & LangGraph State Graph) */}
+      <MasterPromptArchitectureModal
+        isOpen={isArchitectureOpen}
+        onClose={() => setIsArchitectureOpen(false)}
       />
 
       {/* Security & Devices Modal (Section 9 & 10) */}

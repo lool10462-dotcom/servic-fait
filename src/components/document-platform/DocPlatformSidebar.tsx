@@ -10,7 +10,8 @@ import {
   Cloud,
   ChevronRight,
   Laptop,
-  KeyRound
+  KeyRound,
+  Workflow
 } from 'lucide-react';
 
 interface DocPlatformSidebarProps {
@@ -18,13 +19,15 @@ interface DocPlatformSidebarProps {
   onSelectTab: (tab: string) => void;
   documentCount: number;
   onOpenSecurity?: () => void;
+  onOpenArchitecture?: () => void;
 }
 
 export default function DocPlatformSidebar({
   activeTab,
   onSelectTab,
   documentCount,
-  onOpenSecurity
+  onOpenSecurity,
+  onOpenArchitecture
 }: DocPlatformSidebarProps) {
   const navItems = [
     {
@@ -130,6 +133,21 @@ export default function DocPlatformSidebar({
                 </div>
                 <span className="text-[10px] px-1.5 py-0.5 rounded-md font-mono bg-amber-500/15 text-amber-300 border border-amber-500/30">
                   Gérer
+                </span>
+              </button>
+            )}
+
+            {onOpenArchitecture && (
+              <button
+                onClick={onOpenArchitecture}
+                className="w-full mt-1.5 flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold text-amber-300 hover:text-amber-200 hover:bg-amber-500/15 border border-amber-500/20 transition-all cursor-pointer"
+              >
+                <div className="flex items-center gap-3">
+                  <Workflow className="w-4 h-4 text-amber-400" />
+                  <span>Master Prompt (69 Pts)</span>
+                </div>
+                <span className="text-[10px] px-1.5 py-0.5 rounded-md font-mono bg-amber-500/25 text-amber-200 border border-amber-500/30">
+                  Doc
                 </span>
               </button>
             )}
